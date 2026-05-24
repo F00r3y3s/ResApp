@@ -10,9 +10,12 @@ import {
   Sparkles,
   Sun,
 } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { KitchenAssets, KitchenDesign } from '@/constants/kitchen-design';
+import type { GuestPreferences, PreferencesRepository } from '@/features/onboarding/preferences-repository';
+import { buildTodaySummary } from '@/features/today/today-model';
 
 const expiringItems = [
   { name: 'Spinach', daysLeft: '2 days left', image: KitchenAssets.todaySpinach },
@@ -26,7 +29,38 @@ const mealPlan = [
   { label: 'Dinner: Traybake', Icon: Moon, color: '#1C5F8F' },
 ] as const;
 
-export function TodayScreenContent() {
+export function TodayScreenContent({
+  preferencesRepository,
+}: {
+  preferencesRepository: PreferencesRepository;
+}) {
+  const [preferences, setPreferences] = useState<GuestPreferences | null>(null);
+  const summary = buildTodaySummary({
+    pantryExpiringCount: 3,
+    savedRecipeCount: 4,
+    groceryOpenCount: 3,
+    isOnline: false,
+    hasAccount: false,
+    preferences,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPreferences() {
+      const nextPreferences = await preferencesRepository.getPreferences();
+      if (isMounted) {
+        setPreferences(nextPreferences);
+      }
+    }
+
+    loadPreferences();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [preferencesRepository]);
+
   return (
     <ScrollView
       style={styles.screen}
@@ -35,7 +69,7 @@ export function TodayScreenContent() {
       <View style={styles.header}>
         <View style={styles.greetingCopy}>
           <Text style={styles.greeting}>Good evening, Khan family</Text>
-          <Text style={styles.subGreeting}>Dinner plan for today</Text>
+          <Text style={styles.subGreeting}>{summary.dinnerPlanLabel}</Text>
         </View>
         <Image source={KitchenAssets.todayFamilyAvatar} resizeMode="cover" style={styles.familyAvatar} />
       </View>

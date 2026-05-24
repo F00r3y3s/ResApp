@@ -22,3 +22,8 @@ This checklist is a release gate. Do not submit to App Store Review until every 
 | Pending | Every tappable control is at least 44 by 44 points | Design QA | Device QA notes |
 | Pending | App Review Notes include a working demo account | Release | App Store Connect notes |
 | Pending | App Review Notes include private AI scan screen recording link | Release | App Store Connect notes |
+
+## Phase Notes
+
+- Phase 2 onboarding preferences and sync-consent screens are local-only. No account sync,
+  authenticated settings, backend auth, AI processing, or telemetry gates changed in this phase.

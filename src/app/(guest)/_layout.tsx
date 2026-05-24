@@ -85,6 +85,20 @@ export default function GuestTabsLayout() {
           tabBarIcon: ({ color, size }) => <Settings size={size} stroke={color} />,
         }}
       />
+      <Tabs.Screen
+        name="onboarding"
+        options={{
+          href: null,
+          title: 'Onboarding',
+        }}
+      />
+      <Tabs.Screen
+        name="sync-consent"
+        options={{
+          href: null,
+          title: 'Sync consent',
+        }}
+      />
     </Tabs>
   );
 }
