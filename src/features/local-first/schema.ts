@@ -91,6 +91,28 @@ const mealPlans = new Table(
   },
 );
 
+const guestPreferences = new Table(
+  {
+    local_id: column.text,
+    language: column.text,
+    region: column.text,
+    household_size: column.integer,
+    dietary_rules_json: column.text,
+    allergies_json: column.text,
+    cuisines_json: column.text,
+    goals_json: column.text,
+    privacy: column.text,
+    updated_at: column.text,
+    deleted_at: column.text,
+  },
+  {
+    indexes: {
+      guest_preferences_region: ['region'],
+      guest_preferences_updated: ['updated_at'],
+    },
+  },
+);
+
 const syncQueue = new Table(
   {
     local_id: column.text,
@@ -114,6 +136,7 @@ export const AppSchema = new Schema({
   grocery_items: groceryItems,
   saved_recipes: savedRecipes,
   meal_plans: mealPlans,
+  guest_preferences: guestPreferences,
   sync_queue: syncQueue,
 });
 
@@ -122,3 +145,4 @@ export type PantryItemRecord = Database['pantry_items'];
 export type GroceryItemRecord = Database['grocery_items'];
 export type SavedRecipeRecord = Database['saved_recipes'];
 export type MealPlanRecord = Database['meal_plans'];
+export type GuestPreferencesRecord = Database['guest_preferences'];

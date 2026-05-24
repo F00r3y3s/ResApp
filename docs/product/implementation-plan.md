@@ -41,7 +41,7 @@
 
 ## Phase 2: Onboarding To First Value
 
-- [ ] Add local preferences schema for language, region, diet, allergy, cuisine, and goals.
+- [x] Add local preferences schema for language, region, diet, allergy, cuisine, and goals.
 - [ ] Build onboarding routes under `(guest)` and persist locally.
 - [ ] Update Today model to reflect preferences offline.
 - [ ] Add sync-consent screen that explains local import before account sync.
