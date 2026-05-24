@@ -1,32 +1,26 @@
 import { Tabs } from 'expo-router';
 import { BookOpen, CalendarDays, Home, ListChecks, Settings, Wheat } from 'lucide-react-native';
 
-import { Colors } from '@/constants/theme';
+import { KitchenDesign } from '@/constants/kitchen-design';
 
 export default function GuestTabsLayout() {
-  const tintColor = Colors.light.herb;
+  const tintColor = KitchenDesign.colors.ink;
 
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: tintColor,
-        tabBarInactiveTintColor: Colors.light.textSecondary,
+        tabBarInactiveTintColor: KitchenDesign.colors.muted,
         tabBarStyle: {
-          minHeight: 64,
-          paddingTop: 8,
-          paddingBottom: 8,
-          backgroundColor: Colors.light.surface,
-          borderTopColor: Colors.light.border,
+          minHeight: 76,
+          paddingTop: 10,
+          paddingBottom: 10,
+          backgroundColor: KitchenDesign.colors.porcelain,
+          borderTopColor: KitchenDesign.colors.border,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '700',
-        },
-        headerStyle: {
-          backgroundColor: Colors.light.background,
-        },
-        headerTitleStyle: {
-          color: Colors.light.text,
           fontWeight: '800',
         },
       }}>
