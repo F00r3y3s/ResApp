@@ -12,8 +12,10 @@ import {
 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KitchenAssets, KitchenDesign } from '@/constants/kitchen-design';
+
 import type { GuestPreferences, PreferencesRepository } from '@/features/onboarding/preferences-repository';
 import { buildTodaySummary } from '@/features/today/today-model';
 
@@ -34,6 +36,7 @@ export function TodayScreenContent({
 }: {
   preferencesRepository: PreferencesRepository;
 }) {
+  const insets = useSafeAreaInsets();
   const [preferences, setPreferences] = useState<GuestPreferences | null>(null);
   const summary = buildTodaySummary({
     pantryExpiringCount: 3,
@@ -65,7 +68,8 @@ export function TodayScreenContent({
     <ScrollView
       style={styles.screen}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.content}>
+      contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 34) }]}>
+
       <View style={styles.header}>
         <View style={styles.greetingCopy}>
           <Text style={styles.greeting}>Good evening, Khan family</Text>

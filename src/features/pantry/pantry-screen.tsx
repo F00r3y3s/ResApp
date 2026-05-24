@@ -18,6 +18,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { ZodError } from 'zod';
 
 import { KitchenAssets, KitchenDesign } from '@/constants/kitchen-design';
@@ -64,6 +66,7 @@ const pantryItemDetails = {
 } as const;
 
 export function PantryScreenContent({ repository }: PantryScreenContentProps) {
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<PantryItem[]>([]);
   const [form, setForm] = useState(initialFormState);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -137,8 +140,9 @@ export function PantryScreenContent({ repository }: PantryScreenContentProps) {
     <ScrollView
       style={styles.screen}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 30) }]}
       keyboardShouldPersistTaps="handled">
+
       <View style={styles.header}>
         <Text style={styles.title}>Pantry</Text>
         <UserCircle size={44} stroke={KitchenDesign.colors.ink} />

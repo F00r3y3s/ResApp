@@ -2,8 +2,10 @@ import { router } from 'expo-router';
 import { Check, Minus, Plus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KitchenDesign } from '@/constants/kitchen-design';
+
 
 import type { GuestPreferencesInput, PreferencesRepository } from './preferences-repository';
 
@@ -51,6 +53,7 @@ const cuisineOptions = ['levantine', 'indian', 'pakistani', 'turkish', 'emirati'
 const goalOptions = ['save-money', 'reduce-waste', 'quick-dinners', 'ramadan-prep', 'healthy-meals'] as const;
 
 export function OnboardingScreenContent({ repository }: OnboardingScreenContentProps) {
+  const insets = useSafeAreaInsets();
   const [stepIndex, setStepIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -101,7 +104,8 @@ export function OnboardingScreenContent({ repository }: OnboardingScreenContentP
     <ScrollView
       style={styles.screen}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.content}>
+      contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 18) }]}>
+
       <View style={styles.progressRow}>
         <Text style={styles.progressText}>{progressLabel}</Text>
         <View style={styles.progressTrack}>
