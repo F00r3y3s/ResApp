@@ -102,6 +102,7 @@
       "/.expo/"
     ],
     "moduleNameMapper": {
+      "^@/global.css$": "<rootDir>/src/test/style-mock.ts",
       "^@/(.*)$": "<rootDir>/src/$1"
     }
   }
