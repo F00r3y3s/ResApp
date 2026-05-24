@@ -37,18 +37,60 @@ describe('PantryScreenContent', () => {
 
     await screen.findByText('No pantry items yet');
 
+    fireEvent.press(screen.getByText('Add item'));
     fireEvent.changeText(screen.getByPlaceholderText('Brown rice'), 'Brown rice');
     fireEvent.changeText(screen.getByPlaceholderText('2'), '2');
     fireEvent.changeText(screen.getByPlaceholderText('bags'), 'bags');
     fireEvent.changeText(screen.getByPlaceholderText('Pantry'), 'Pantry');
     fireEvent.changeText(screen.getByPlaceholderText('YYYY-MM-DD'), '2026-08-01');
-    fireEvent.press(screen.getByText('Add item'));
+    fireEvent.press(screen.getByText('Save item'));
 
     await waitFor(() => {
       expect(screen.getByText('Brown rice')).toBeTruthy();
       expect(screen.getByText('2 bags')).toBeTruthy();
-      expect(screen.getByText('Pantry')).toBeTruthy();
-      expect(screen.getByText('Expires 2026-08-01')).toBeTruthy();
+      expect(screen.getAllByText('Pantry').length).toBeGreaterThan(0);
+      expect(screen.getByText('Aug 1')).toBeTruthy();
     });
+  });
+
+  it('renders the screen 17 pantry controls and expiry groups', async () => {
+    const repository = createTestRepository();
+    await repository.addItem({
+      name: 'Spinach',
+      quantity: 1,
+      unit: 'bag',
+      location: 'Fridge',
+      expiresAt: '2026-05-27',
+    });
+    await repository.addItem({
+      name: 'Tomatoes',
+      quantity: 6,
+      unit: '',
+      location: 'Pantry',
+      expiresAt: '2026-05-30',
+    });
+    await repository.addItem({
+      name: 'Frozen peas',
+      quantity: 1,
+      unit: 'pack',
+      location: 'Freezer',
+      expiresAt: '2026-06-18',
+    });
+
+    render(<PantryScreenContent repository={repository} />);
+
+    await screen.findByText('Expiring soon');
+
+    expect(screen.getAllByText('Pantry').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Fridge').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Freezer').length).toBeGreaterThan(0);
+    expect(screen.getByText('Search ingredients')).toBeTruthy();
+    expect(screen.getByText('barcode scan')).toBeTruthy();
+    expect(screen.getByText('Expiring soon')).toBeTruthy();
+    expect(screen.getByText('This week')).toBeTruthy();
+    expect(screen.getByText('Later')).toBeTruthy();
+    expect(screen.getByText('May 27')).toBeTruthy();
+    expect(screen.getByText('May 30')).toBeTruthy();
+    expect(screen.getByText('Jun 18')).toBeTruthy();
   });
 });

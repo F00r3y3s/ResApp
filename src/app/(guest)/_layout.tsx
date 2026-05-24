@@ -1,27 +1,37 @@
 import { Tabs } from 'expo-router';
-import { BookOpen, CalendarDays, Home, ListChecks, Settings, Wheat } from 'lucide-react-native';
+import {
+  BookOpen,
+  CalendarDays,
+  Camera,
+  Home,
+  Settings,
+  ShoppingBasket,
+  Wheat,
+} from 'lucide-react-native';
 
 import { KitchenDesign } from '@/constants/kitchen-design';
 
 export default function GuestTabsLayout() {
-  const tintColor = KitchenDesign.colors.ink;
+  const tintColor = KitchenDesign.colors.orange;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: tintColor,
-        tabBarInactiveTintColor: KitchenDesign.colors.muted,
+        tabBarInactiveTintColor: '#333333',
         tabBarStyle: {
-          minHeight: 76,
-          paddingTop: 10,
-          paddingBottom: 10,
+          minHeight: 86,
+          paddingTop: 12,
+          paddingBottom: 12,
           backgroundColor: KitchenDesign.colors.porcelain,
           borderTopColor: KitchenDesign.colors.border,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '800',
+          fontSize: 13,
+          fontWeight: '500',
         },
       }}>
       <Tabs.Screen
@@ -32,10 +42,10 @@ export default function GuestTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="pantry"
+        name="lens"
         options={{
-          title: 'Pantry',
-          tabBarIcon: ({ color, size }) => <Wheat size={size} stroke={color} />,
+          title: 'Lens',
+          tabBarIcon: ({ color, size }) => <Camera size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
@@ -46,25 +56,33 @@ export default function GuestTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="planner"
+        options={{
+          title: 'Plan',
+          tabBarIcon: ({ color, size }) => <CalendarDays size={size} stroke={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="grocery"
         options={{
           title: 'Grocery',
-          tabBarIcon: ({ color, size }) => <ListChecks size={size} stroke={color} />,
+          tabBarIcon: ({ color, size }) => <ShoppingBasket size={size} stroke={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="pantry"
+        options={{
+          href: null,
+          title: 'Pantry',
+          tabBarIcon: ({ color, size }) => <Wheat size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
+          href: null,
           title: 'Settings',
           tabBarIcon: ({ color, size }) => <Settings size={size} stroke={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="planner"
-        options={{
-          title: 'Planner',
-          href: null,
-          tabBarIcon: ({ color, size }) => <CalendarDays size={size} stroke={color} />,
         }}
       />
     </Tabs>

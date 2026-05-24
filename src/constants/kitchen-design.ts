@@ -37,4 +37,16 @@ export const KitchenDesign = {
 export const KitchenAssets = {
   welcomeHero: require('../../assets/recipee screens/2.png'),
   countertopSplash: require('../../assets/recipee screens/1.png'),
+  todayTraybake: require('../../assets/images/reference-crops/today-traybake.png'),
+  todayFamilyAvatar: require('../../assets/images/reference-crops/today-family-avatar.png'),
+  todaySpinach: require('../../assets/images/reference-crops/today-spinach.png'),
+  todayYogurt: require('../../assets/images/reference-crops/today-yogurt.png'),
+  todayTomatoes: require('../../assets/images/reference-crops/today-tomatoes.png'),
+  todayAishaAvatar: require('../../assets/images/reference-crops/today-aisha-avatar.png'),
+  todayBiryani: require('../../assets/images/reference-crops/today-biryani.png'),
+  pantrySpinach: require('../../assets/images/reference-crops/pantry-spinach.png'),
+  pantryYogurt: require('../../assets/images/reference-crops/pantry-yogurt.png'),
+  pantryTomatoes: require('../../assets/images/reference-crops/pantry-tomatoes.png'),
+  pantryPeas: require('../../assets/images/reference-crops/pantry-peas.png'),
+  pantryRice: require('../../assets/images/reference-crops/pantry-rice.png'),
 } as const;
