@@ -171,7 +171,7 @@ export function PantryScreenContent({ repository }: PantryScreenContentProps) {
           {isSaving ? (
             <ActivityIndicator color={Colors.light.surface} />
           ) : (
-            <Plus color={Colors.light.surface} size={18} />
+            <Plus size={18} stroke={Colors.light.surface} />
           )}
           <Text style={styles.addButtonText}>{isSaving ? 'Adding...' : 'Add item'}</Text>
         </Pressable>

@@ -42,7 +42,7 @@ export function TodayScreenContent() {
           style={styles.heroImageFrame}>
           <View style={styles.heroOverlay}>
             <View style={styles.privacyBadge}>
-              <ShieldCheck color={KitchenDesign.colors.cream} size={16} />
+              <ShieldCheck size={16} stroke={KitchenDesign.colors.cream} />
               <Text style={styles.privacyBadgeText}>{summary.modeLabel}</Text>
             </View>
           </View>
@@ -58,8 +58,8 @@ export function TodayScreenContent() {
               style={styles.logoTileImage}
             />
             <View style={styles.logoMark}>
-              <ChefHat color={KitchenDesign.colors.ink} size={34} />
-              <Sparkles color={KitchenDesign.colors.orange} size={18} />
+              <ChefHat size={34} stroke={KitchenDesign.colors.ink} />
+              <Sparkles size={18} stroke={KitchenDesign.colors.orange} />
             </View>
           </View>
           <Text style={styles.title}>Family Kitchen</Text>
@@ -68,7 +68,7 @@ export function TodayScreenContent() {
 
         <View style={styles.statusCard}>
           <View style={styles.statusIcon}>
-            <Clock3 color={KitchenDesign.colors.orange} size={20} />
+            <Clock3 size={20} stroke={KitchenDesign.colors.orange} />
           </View>
           <View style={styles.statusCopy}>
             <Text style={styles.statusTitle}>Core tools work offline</Text>
@@ -80,7 +80,7 @@ export function TodayScreenContent() {
           accessibilityRole="button"
           onPress={() => router.push('/pantry')}
           style={({ pressed }) => [styles.primaryButton, pressed ? styles.pressed : null]}>
-          <ChefHat color={KitchenDesign.colors.cream} size={22} />
+          <ChefHat size={22} stroke={KitchenDesign.colors.cream} />
           <Text style={styles.primaryButtonText}>Add pantry item</Text>
         </Pressable>
 
@@ -109,7 +109,7 @@ export function TodayScreenContent() {
                 onPress={() => router.push(action.href)}
                 style={({ pressed }) => [styles.actionRow, pressed ? styles.pressed : null]}>
                 <View style={styles.actionIcon}>
-                  <Icon color={KitchenDesign.colors.ink} size={22} />
+                  <Icon size={22} stroke={KitchenDesign.colors.ink} />
                 </View>
                 <View style={styles.actionCopy}>
                   <Text style={styles.actionTitle}>{action.title}</Text>

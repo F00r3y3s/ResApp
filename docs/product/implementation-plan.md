@@ -6,7 +6,9 @@
 
 **Architecture:** Expo Router route groups separate guest, authenticated, premium, and modal flows. PowerSync SQLite is the primary local model, while Supabase, RevenueCat, and OpenAI remain behind explicit backend/account/entitlement boundaries.
 
-**Tech Stack:** Expo SDK 56, React 19, React Native 0.85, TypeScript 6, PowerSync, Supabase, RevenueCat, NativeWind/Tailwind v4, Jest/RNTL, Maestro, EAS.
+**Tech Stack:** Expo, Expo Router, React 19, React Native, TypeScript, PowerSync, Supabase, RevenueCat, Jest/RNTL, Maestro, EAS.
+
+**Current branch note:** This branch is temporarily aligned to Expo SDK 54 so the app can run in the current App Store Expo Go client, which reports client version 54.0.8 and supported SDK 54. The production native stack still needs a development build path before returning to SDK 56-only native modules.
 
 ---
 
@@ -26,16 +28,16 @@
 - [x] Add App Store gate model and release checklist.
 - [x] Add privacy contract and threat model.
 - [x] Add PowerSync schema skeleton and Supabase connector boundary.
-- [ ] Add first repository implementation for local pantry writes.
-- [ ] Add Maestro offline smoke flow that launches Today and checks offline copy.
+- [x] Add first repository implementation for local pantry writes.
+- [x] Add Maestro offline smoke flow that launches Today and checks offline copy.
 
 ## Phase 1: Guest Pantry Persistence
 
-- [ ] Write failing repository test for inserting a pantry item while offline.
-- [ ] Implement local pantry repository against PowerSync SQLite.
-- [ ] Wire Add Pantry Item form with validation for name, quantity, unit, location, and expiry.
-- [ ] Persist and reload pantry items after app restart.
-- [ ] Add Maestro offline add-item smoke test.
+- [x] Write failing repository test for inserting a pantry item while offline.
+- [x] Implement local pantry repository against PowerSync SQLite.
+- [x] Wire Add Pantry Item form with validation for name, quantity, unit, location, and expiry.
+- [x] Persist and reload pantry items after app restart.
+- [x] Add Maestro offline add-item smoke test.
 
 ## Phase 2: Onboarding To First Value
 

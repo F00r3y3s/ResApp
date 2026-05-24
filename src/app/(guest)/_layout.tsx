@@ -28,35 +28,35 @@ export default function GuestTabsLayout() {
         name="index"
         options={{
           title: 'Today',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Home size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="pantry"
         options={{
           title: 'Pantry',
-          tabBarIcon: ({ color, size }) => <Wheat color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Wheat size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="recipes"
         options={{
           title: 'Recipes',
-          tabBarIcon: ({ color, size }) => <BookOpen color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <BookOpen size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="grocery"
         options={{
           title: 'Grocery',
-          tabBarIcon: ({ color, size }) => <ListChecks color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <ListChecks size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Settings size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
@@ -64,7 +64,7 @@ export default function GuestTabsLayout() {
         options={{
           title: 'Planner',
           href: null,
-          tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <CalendarDays size={size} stroke={color} />,
         }}
       />
     </Tabs>
