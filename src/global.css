@@ -1,0 +1,15 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+@import "nativewind/theme";
+
+@theme {
+  --color-kitchen-cream: #f7f2ea;
+  --color-kitchen-ink: #27231f;
+  --color-kitchen-herb: #3f6f4e;
+  --color-kitchen-tomato: #c6533d;
+  --color-kitchen-blue: #3c6f8f;
+  --color-kitchen-gold: #d9a441;
+  --font-display: Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+}

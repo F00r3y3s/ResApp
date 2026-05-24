@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Family AI Kitchen",
+    "slug": "family-ai-kitchen",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "familyaikitchen",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.familyaikitchen.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Family AI Kitchen uses the camera so you can scan pantry items, receipts, labels, and recipe photos after consent.",
+        "NSPhotoLibraryUsageDescription": "Family AI Kitchen lets you choose photos for recipe import and kitchen scan review after consent."
+      }
+    },
+    "android": {
+      "package": "com.familyaikitchen.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F2EA",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F2EA",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 76
+          }
+        }
+      ],
+      "@journeyapps/react-native-quick-sqlite",
+      "expo-secure-store",
+      "@sentry/react-native"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
