@@ -23,6 +23,7 @@ import type { Recipe } from '@/features/recipes/recipes-repository';
 import type { ChatRepository } from './chat-repository';
 import type { ChatMessage } from './chat-types';
 import { generateLocalResponse } from './local-responder';
+import { detectAllergyConflicts } from './substitutions';
 
 const SUGGESTED_PROMPTS = [
   'What can I cook tonight?',
@@ -125,6 +126,21 @@ export function ChatScreenContent({
           });
           assistantContent = `${local.text}\n\n_Premium AI is unavailable right now. Showing Smart Chef Lite._`;
           assistantSource = 'local';
+        }
+
+        // Allergen guardrail: scan AI response for conflicts with user allergies
+        if (assistantSource === 'gateway') {
+          const userAllergens = preferences?.allergies ?? [];
+          if (userAllergens.length > 0) {
+            const words = extractIngredientCandidates(assistantContent);
+            const conflicts = detectAllergyConflicts(words, userAllergens);
+            if (conflicts.length > 0) {
+              const triggered = Array.from(
+                new Set(conflicts.flatMap((c) => c.allergens)),
+              ).join(', ');
+              assistantContent = `⚠️ This response mentions ingredients you're allergic to (${triggered}). Please double-check before cooking.\n\n${assistantContent}`;
+            }
+          }
         }
       } else {
         const local = generateLocalResponse({
@@ -292,6 +308,27 @@ let messageIdCounter = 0;
 function defaultMessageId(): string {
   messageIdCounter += 1;
   return `msg-${Date.now()}-${messageIdCounter}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Extracts likely ingredient mentions from AI-generated text.
+ * Splits on common punctuation and whitespace; keeps multi-word fragments
+ * for the substring-based allergen lookup.
+ */
+function extractIngredientCandidates(text: string): string[] {
+  // Split on commas, periods, newlines, and bullet points to get candidate phrases.
+  const fragments = text
+    .split(/[,.;:\n•·\-–—]+/g)
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0);
+
+  // Also include individual words for shorter ingredient names (e.g., "milk").
+  const words = text
+    .split(/[\s,.;:\n•·\-–—()]+/g)
+    .map((w) => w.trim())
+    .filter((w) => w.length > 1);
+
+  return [...fragments, ...words];
 }
 
 const styles = StyleSheet.create({

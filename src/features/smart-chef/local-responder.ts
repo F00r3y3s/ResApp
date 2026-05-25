@@ -2,11 +2,14 @@ import type { GuestPreferences } from '@/features/onboarding/preferences-reposit
 import type { PantryItem } from '@/features/pantry/pantry-repository';
 import type { Recipe } from '@/features/recipes/recipes-repository';
 
+import { lookupSubstitutions, type SubstitutionResult } from './substitutions';
 import { generateLocalSuggestions, type ScoredSuggestion } from './suggestion-engine';
 
 export type LocalResponse = {
   text: string;
   suggestions: ScoredSuggestion[];
+  /** If the message asked for a substitution, the lookup result. */
+  substitution?: SubstitutionResult;
 };
 
 export type LocalResponderInput = {
@@ -25,6 +28,12 @@ export type LocalResponderInput = {
  */
 export function generateLocalResponse(input: LocalResponderInput): LocalResponse {
   const { userMessage, recipes, pantryItems, preferences, now } = input;
+
+  // Substitution intent — answer locally without calling suggestion engine
+  const substitutionTarget = detectSubstitutionIntent(userMessage);
+  if (substitutionTarget) {
+    return buildSubstitutionResponse(substitutionTarget, preferences);
+  }
 
   const suggestions = generateLocalSuggestions({
     recipes,
@@ -107,4 +116,76 @@ function getGreeting(userMessage: string): string {
   if (lower.includes('healthy')) return 'For a healthy option,';
 
   return 'Sure!';
+}
+
+/**
+ * Detects whether the user is asking for a substitution.
+ *
+ * Matches patterns like:
+ *   "substitute for butter"
+ *   "swap X for butter"
+ *   "what can I use instead of butter"
+ *   "alternative to butter"
+ *   "replace butter"
+ *
+ * Returns the canonical ingredient name (trimmed, lowercased) or null.
+ */
+function detectSubstitutionIntent(userMessage: string): string | null {
+  const lower = userMessage.toLocaleLowerCase().trim();
+
+  const patterns: RegExp[] = [
+    /substitute\s+(?:for|to)\s+([a-z][a-z\s]+?)(?:\?|$|\s+in\b|\s+for\b)/i,
+    /(?:swap|replace)\s+([a-z][a-z\s]+?)(?:\?|$|\s+with\b|\s+for\b|\s+in\b)/i,
+    /(?:instead of|alternative to|alternatives? for)\s+([a-z][a-z\s]+?)(?:\?|$|\s+in\b)/i,
+    /(?:no|out of|don't have|dont have)\s+([a-z][a-z\s]+?)(?:\?|$|,|\s+(?:in|for|to)\b)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = lower.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim().replace(/[?.,!]+$/, '');
+    }
+  }
+
+  return null;
+}
+
+function buildSubstitutionResponse(
+  ingredient: string,
+  preferences: GuestPreferences | null,
+): LocalResponse {
+  const allergens = preferences?.allergies ?? [];
+  const result = lookupSubstitutions(ingredient, { userAllergens: allergens });
+
+  if (!result.found) {
+    return {
+      text: `I don't have a substitution for "${ingredient}" yet. Try asking the AI Chef (premium) for more options.`,
+      suggestions: [],
+      substitution: result,
+    };
+  }
+
+  if (result.safeSubstitutes.length === 0) {
+    const blockedNames = result.blockedSubstitutes.map((b) => b.substitute.name).join(', ');
+    return {
+      text: `All my usual ${result.ingredient} substitutes contain your allergens. (Skipped: ${blockedNames}.) Try the AI Chef (premium) for tailored options.`,
+      suggestions: [],
+      substitution: result,
+    };
+  }
+
+  const top = result.safeSubstitutes.slice(0, 3);
+  const lines = top.map((s) => `• ${s.name} — ${s.note}`);
+  let text = `For ${result.ingredient}, you can use:\n${lines.join('\n')}`;
+
+  if (result.blockedSubstitutes.length > 0) {
+    const blockedNames = result.blockedSubstitutes.map((b) => b.substitute.name).join(', ');
+    text += `\n\nSkipped due to your allergies: ${blockedNames}.`;
+  }
+
+  return {
+    text,
+    suggestions: [],
+    substitution: result,
+  };
 }

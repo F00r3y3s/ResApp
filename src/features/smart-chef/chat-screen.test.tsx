@@ -343,4 +343,75 @@ describe('ChatScreenContent', () => {
       expect(userMessages.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  it('warns premium user when AI response mentions allergens', async () => {
+    const repo = createInMemoryChatRepository();
+    // AI response mentions almonds, but user is allergic to tree-nuts
+    const sendToGateway = async () =>
+      'Try a salad with almonds, lettuce, and olive oil.';
+
+    const prefs: GuestPreferences = {
+      ...defaultPreferences,
+      allergies: ['tree-nuts'],
+    };
+
+    render(
+      <ChatScreenContent
+        chatRepository={repo}
+        recipes={[]}
+        pantryItems={[]}
+        preferences={prefs}
+        isPremium={true}
+        sendToGateway={sendToGateway}
+        createMessageId={createMessageId}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Message input')).toBeTruthy();
+    });
+
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Salad ideas');
+    fireEvent.press(screen.getByLabelText('Send message'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/⚠️.*allergic/)).toBeTruthy();
+    });
+  });
+
+  it('does not warn premium user when AI response has no allergen conflicts', async () => {
+    const repo = createInMemoryChatRepository();
+    const sendToGateway = async () =>
+      'Try a rice and bean bowl with onion and tomato.';
+
+    const prefs: GuestPreferences = {
+      ...defaultPreferences,
+      allergies: ['tree-nuts', 'dairy'],
+    };
+
+    render(
+      <ChatScreenContent
+        chatRepository={repo}
+        recipes={[]}
+        pantryItems={[]}
+        preferences={prefs}
+        isPremium={true}
+        sendToGateway={sendToGateway}
+        createMessageId={createMessageId}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Message input')).toBeTruthy();
+    });
+
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Vegan ideas');
+    fireEvent.press(screen.getByLabelText('Send message'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/rice and bean bowl/)).toBeTruthy();
+    });
+
+    expect(screen.queryByText(/⚠️/)).toBeNull();
+  });
 });

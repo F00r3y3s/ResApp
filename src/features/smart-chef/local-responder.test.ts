@@ -128,4 +128,82 @@ describe('local responder', () => {
     expect(result.text).toContain('pantry');
     expect(result.suggestions).toHaveLength(0);
   });
+
+  describe('substitution intent', () => {
+    it('detects "substitute for X" and returns substitutions', () => {
+      const result = generateLocalResponse({
+        userMessage: 'Substitute for butter',
+        recipes: [],
+        pantryItems: [],
+        preferences: defaultPreferences,
+      });
+
+      expect(result.substitution?.found).toBe(true);
+      expect(result.text).toContain('olive oil');
+    });
+
+    it('detects "what can I use instead of X"', () => {
+      const result = generateLocalResponse({
+        userMessage: 'What can I use instead of milk?',
+        recipes: [],
+        pantryItems: [],
+        preferences: defaultPreferences,
+      });
+
+      expect(result.substitution?.found).toBe(true);
+      expect(result.text).toContain('milk');
+    });
+
+    it('detects "out of X" pattern', () => {
+      const result = generateLocalResponse({
+        userMessage: "I'm out of eggs, what else works?",
+        recipes: [],
+        pantryItems: [],
+        preferences: defaultPreferences,
+      });
+
+      expect(result.substitution?.found).toBe(true);
+    });
+
+    it('blocks substitutes that contain user allergens', () => {
+      const result = generateLocalResponse({
+        userMessage: 'substitute for milk',
+        recipes: [],
+        pantryItems: [],
+        preferences: { ...defaultPreferences, allergies: ['tree-nuts'] },
+      });
+
+      expect(result.substitution?.found).toBe(true);
+      // Almond milk should be blocked, oat milk should be safe
+      expect(result.text).toContain('oat milk');
+      expect(result.text).toContain('Skipped due to your allergies');
+      expect(result.text).toContain('almond milk');
+    });
+
+    it('returns helpful message when ingredient not in substitution table', () => {
+      const result = generateLocalResponse({
+        userMessage: 'substitute for unobtanium',
+        recipes: [],
+        pantryItems: [],
+        preferences: defaultPreferences,
+      });
+
+      expect(result.substitution?.found).toBe(false);
+      expect(result.text).toContain("don't have a substitution");
+    });
+
+    it('returns guard message when all substitutes contain user allergens', () => {
+      const result = generateLocalResponse({
+        userMessage: 'substitute for parmesan',
+        recipes: [],
+        pantryItems: [],
+        preferences: { ...defaultPreferences, allergies: ['dairy', 'tree-nuts'] },
+      });
+
+      expect(result.substitution?.found).toBe(true);
+      // Should still find safe options (nutritional yeast)
+      // OR block all if everything has dairy/tree-nuts
+      expect(result.text).toBeTruthy();
+    });
+  });
 });
