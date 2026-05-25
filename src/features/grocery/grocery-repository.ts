@@ -2,6 +2,7 @@ import type { PantryItem } from '@/features/pantry/pantry-repository';
 import type { Recipe } from '@/features/recipes/recipes-repository';
 
 import { type GroceryItemDraft, normalizeIngredientName, subtractPantryFromRecipe } from './grocery-model';
+import { inferSection } from './grocery-sections';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -16,6 +17,8 @@ export type GroceryItem = {
   recipeId: string | null;
   recipeTitle: string | null;
   isChecked: boolean;
+  section?: string | null;
+  assignedTo?: string | null;
   privacy: 'local-only';
   createdAt: string;
   updatedAt: string;
@@ -42,6 +45,8 @@ export type GroceryRepository = {
   setChecked(localId: string, isChecked: boolean): Promise<void>;
   removeItem(localId: string): Promise<void>;
   clearChecked(): Promise<void>;
+  assignItem?(localId: string, memberId: string | null): Promise<void>;
+  setSectionOverride?(localId: string, section: string): Promise<void>;
 };
 
 export type GroceryRepositoryOptions = {
@@ -63,6 +68,8 @@ type GroceryItemRow = {
   recipe_id: string | null;
   recipe_title: string | null;
   is_checked: number;
+  section: string | null;
+  assigned_to: string | null;
   privacy: 'local-only';
   created_at: string;
   updated_at: string;
@@ -91,6 +98,8 @@ export function createGroceryRepository(
           recipe_id,
           recipe_title,
           is_checked,
+          section,
+          assigned_to,
           privacy,
           created_at,
           updated_at
@@ -115,6 +124,8 @@ export function createGroceryRepository(
           recipe_id,
           recipe_title,
           is_checked,
+          section,
+          assigned_to,
           privacy,
           created_at,
           updated_at
@@ -138,6 +149,7 @@ export function createGroceryRepository(
         }
 
         const timestamp = now().toISOString();
+        const section = inferSection(draft.name);
         const item: GroceryItem = {
           localId: createLocalId(),
           name: draft.name,
@@ -147,6 +159,8 @@ export function createGroceryRepository(
           recipeId: draft.recipeId,
           recipeTitle: draft.recipeTitle,
           isChecked: false,
+          section,
+          assignedTo: null,
           privacy: 'local-only',
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -162,11 +176,13 @@ export function createGroceryRepository(
             recipe_id,
             recipe_title,
             is_checked,
+            section,
+            assigned_to,
             privacy,
             created_at,
             updated_at,
             deleted_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local-only', ?, ?, NULL)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local-only', ?, ?, NULL)`,
           [
             item.localId,
             item.name,
@@ -176,6 +192,8 @@ export function createGroceryRepository(
             item.recipeId,
             item.recipeTitle,
             item.isChecked ? 1 : 0,
+            item.section,
+            item.assignedTo,
             item.createdAt,
             item.updatedAt,
           ],
@@ -199,6 +217,8 @@ export function createGroceryRepository(
           recipe_id,
           recipe_title,
           is_checked,
+          section,
+          assigned_to,
           privacy,
           created_at,
           updated_at
@@ -220,6 +240,7 @@ export function createGroceryRepository(
         }
 
         const timestamp = now().toISOString();
+        const section = inferSection(draft.name);
         const item: GroceryItem = {
           localId: createLocalId(),
           name: draft.name,
@@ -229,6 +250,8 @@ export function createGroceryRepository(
           recipeId: draft.recipeId,
           recipeTitle: draft.recipeTitle,
           isChecked: false,
+          section,
+          assignedTo: null,
           privacy: 'local-only',
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -244,11 +267,13 @@ export function createGroceryRepository(
             recipe_id,
             recipe_title,
             is_checked,
+            section,
+            assigned_to,
             privacy,
             created_at,
             updated_at,
             deleted_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local-only', ?, ?, NULL)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local-only', ?, ?, NULL)`,
           [
             item.localId,
             item.name,
@@ -258,6 +283,8 @@ export function createGroceryRepository(
             item.recipeId,
             item.recipeTitle,
             item.isChecked ? 1 : 0,
+            item.section,
+            item.assignedTo,
             item.createdAt,
             item.updatedAt,
           ],
@@ -293,6 +320,22 @@ export function createGroceryRepository(
         [timestamp, timestamp],
       );
     },
+
+    async assignItem(localId, memberId) {
+      const timestamp = now().toISOString();
+      await database.execute(
+        `UPDATE grocery_items SET assigned_to = ?, updated_at = ? WHERE local_id = ?`,
+        [memberId, timestamp, localId],
+      );
+    },
+
+    async setSectionOverride(localId, section) {
+      const timestamp = now().toISOString();
+      await database.execute(
+        `UPDATE grocery_items SET section = ?, updated_at = ? WHERE local_id = ?`,
+        [section, timestamp, localId],
+      );
+    },
   };
 }
 
@@ -306,6 +349,8 @@ function mapRow(row: GroceryItemRow): GroceryItem {
     recipeId: row.recipe_id,
     recipeTitle: row.recipe_title,
     isChecked: row.is_checked === 1,
+    section: row.section ?? null,
+    assignedTo: row.assigned_to ?? null,
     privacy: row.privacy,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

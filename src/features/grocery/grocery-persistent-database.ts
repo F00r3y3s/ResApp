@@ -11,6 +11,8 @@ type GroceryItemRow = {
   recipe_id: string | null;
   recipe_title: string | null;
   is_checked: number;
+  section: string | null;
+  assigned_to: string | null;
   privacy: 'local-only';
   created_at: string;
   updated_at: string;
@@ -35,6 +37,8 @@ export function createPersistentGroceryDatabase(storage: KeyValueStorage): Groce
           recipeId,
           recipeTitle,
           isChecked,
+          section,
+          assignedTo,
           createdAt,
           updatedAt,
         ] = parameters;
@@ -51,6 +55,8 @@ export function createPersistentGroceryDatabase(storage: KeyValueStorage): Groce
             recipe_id: recipeId === null ? null : String(recipeId),
             recipe_title: recipeTitle === null ? null : String(recipeTitle),
             is_checked: Number(isChecked),
+            section: section === null || section === undefined ? null : String(section),
+            assigned_to: assignedTo === null || assignedTo === undefined ? null : String(assignedTo),
             privacy: 'local-only',
             created_at: String(createdAt),
             updated_at: String(updatedAt),
@@ -70,6 +76,38 @@ export function createPersistentGroceryDatabase(storage: KeyValueStorage): Groce
           rows.map((row) =>
             row.local_id === String(localId)
               ? { ...row, is_checked: Number(isChecked), updated_at: String(updatedAt) }
+              : row,
+          ),
+        );
+        return;
+      }
+
+      if (sql.startsWith('UPDATE grocery_items SET assigned_to')) {
+        const [assignedTo, updatedAt, localId] = parameters;
+        const rows = await readRows(storage);
+        await writeRows(
+          storage,
+          rows.map((row) =>
+            row.local_id === String(localId)
+              ? {
+                  ...row,
+                  assigned_to: assignedTo === null ? null : String(assignedTo),
+                  updated_at: String(updatedAt),
+                }
+              : row,
+          ),
+        );
+        return;
+      }
+
+      if (sql.startsWith('UPDATE grocery_items SET section')) {
+        const [section, updatedAt, localId] = parameters;
+        const rows = await readRows(storage);
+        await writeRows(
+          storage,
+          rows.map((row) =>
+            row.local_id === String(localId)
+              ? { ...row, section: String(section), updated_at: String(updatedAt) }
               : row,
           ),
         );

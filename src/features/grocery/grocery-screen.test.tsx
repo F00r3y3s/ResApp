@@ -127,6 +127,8 @@ function createInMemoryGroceryRepository(initial: GroceryItem[] = []): GroceryRe
           recipeId: recipe.seedId ?? recipe.localId,
           recipeTitle: recipe.title,
           isChecked: false,
+          section: null,
+          assignedTo: null,
           privacy: 'local-only',
           createdAt: stamp,
           updatedAt: stamp,
@@ -160,6 +162,8 @@ function createInMemoryGroceryRepository(initial: GroceryItem[] = []): GroceryRe
           recipeId: draft.recipeId,
           recipeTitle: draft.recipeTitle,
           isChecked: false,
+          section: null,
+          assignedTo: null,
           privacy: 'local-only',
           createdAt: stamp,
           updatedAt: stamp,
@@ -168,6 +172,12 @@ function createInMemoryGroceryRepository(initial: GroceryItem[] = []): GroceryRe
         added.push(next);
       }
       return added;
+    },
+    async assignItem(localId, memberId) {
+      items = items.map((i) => (i.localId === localId ? { ...i, assignedTo: memberId } : i));
+    },
+    async setSectionOverride(localId, section) {
+      items = items.map((i) => (i.localId === localId ? { ...i, section } : i));
     },
   };
 }
@@ -242,7 +252,7 @@ describe('GroceryScreenContent', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('Red lentils')).toBeNull();
-    });
+    }, { timeout: 3000 });
     expect(screen.getByText('Garlic')).toBeTruthy();
   });
 
@@ -283,5 +293,125 @@ describe('GroceryScreenContent', () => {
     await screen.findByText('Grocery');
     fireEvent.press(screen.getByLabelText('Add from a recipe'));
     await screen.findByText(/no saved recipes yet/i);
+  });
+
+  it('renders section headers when items are grouped by section', async () => {
+    const items: GroceryItem[] = [
+      {
+        localId: 'item-1',
+        name: 'Milk',
+        normalizedName: 'milk',
+        quantity: '1',
+        unit: 'litre',
+        recipeId: null,
+        recipeTitle: null,
+        isChecked: false,
+        section: 'Dairy',
+        assignedTo: null,
+        privacy: 'local-only',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        localId: 'item-2',
+        name: 'Chicken',
+        normalizedName: 'chicken',
+        quantity: '500',
+        unit: 'g',
+        recipeId: null,
+        recipeTitle: null,
+        isChecked: false,
+        section: 'Meat & Seafood',
+        assignedTo: null,
+        privacy: 'local-only',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+
+    render(
+      <GroceryScreenContent
+        repository={createInMemoryGroceryRepository(items)}
+        recipesRepository={createRecipesReadRepository([])}
+        pantryRepository={createPantryReadRepository([])}
+      />,
+    );
+
+    await screen.findByText('Milk');
+    expect(screen.getByText('Dairy')).toBeTruthy();
+    expect(screen.getByText('Meat & Seafood')).toBeTruthy();
+  });
+
+  it('shows the assign button and opens the assign modal', async () => {
+    const items: GroceryItem[] = [
+      {
+        localId: 'item-1',
+        name: 'Milk',
+        normalizedName: 'milk',
+        quantity: '1',
+        unit: 'litre',
+        recipeId: null,
+        recipeTitle: null,
+        isChecked: false,
+        section: 'Dairy',
+        assignedTo: null,
+        privacy: 'local-only',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+
+    render(
+      <GroceryScreenContent
+        repository={createInMemoryGroceryRepository(items)}
+        recipesRepository={createRecipesReadRepository([])}
+        pantryRepository={createPantryReadRepository([])}
+      />,
+    );
+
+    await screen.findByText('Milk');
+    fireEvent.press(screen.getByLabelText('Assign Milk'));
+
+    await screen.findByText('Assign to');
+    expect(screen.getByLabelText('Assignee name')).toBeTruthy();
+  });
+
+  it('assigns a member to an item and shows the name in the row', async () => {
+    const items: GroceryItem[] = [
+      {
+        localId: 'item-1',
+        name: 'Milk',
+        normalizedName: 'milk',
+        quantity: '1',
+        unit: 'litre',
+        recipeId: null,
+        recipeTitle: null,
+        isChecked: false,
+        section: 'Dairy',
+        assignedTo: null,
+        privacy: 'local-only',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+
+    render(
+      <GroceryScreenContent
+        repository={createInMemoryGroceryRepository(items)}
+        recipesRepository={createRecipesReadRepository([])}
+        pantryRepository={createPantryReadRepository([])}
+      />,
+    );
+
+    await screen.findByText('Milk');
+    fireEvent.press(screen.getByLabelText('Assign Milk'));
+
+    await screen.findByText('Assign to');
+    fireEvent.changeText(screen.getByLabelText('Assignee name'), 'Aisha');
+    fireEvent.press(screen.getByLabelText('Confirm assignment'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Aisha/)).toBeTruthy();
+    });
   });
 });

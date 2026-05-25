@@ -19,6 +19,12 @@ export type RecipeStep = {
   timerMinutes?: number;
 };
 
+export type RemixedFrom = {
+  recipeId: string;
+  title: string;
+  attribution: string;
+};
+
 export type Recipe = {
   localId: string;
   /** 'seed-XXX' for catalog items, generated local id for personal recipes */
@@ -40,6 +46,8 @@ export type Recipe = {
   privacy: 'local-only';
   createdAt: string;
   updatedAt: string;
+  /** Present when this recipe was remixed from another recipe */
+  remixedFrom?: RemixedFrom;
 };
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { Check, Plus, Trash2, X } from 'lucide-react-native';
+import { Check, Plus, Trash2, User, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -7,6 +7,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import type {
     GroceryItem,
     GroceryRepository,
 } from './grocery-repository';
+import { groupItemsBySection } from './grocery-sections';
 
 type GroceryScreenContentProps = {
   repository: GroceryRepository;
@@ -47,6 +49,8 @@ export function GroceryScreenContent({
   const [isPickerBusy, setIsPickerBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastAdd, setLastAdd] = useState<LastAddSummary | null>(null);
+  const [assigningItemId, setAssigningItemId] = useState<string | null>(null);
+  const [assignInput, setAssignInput] = useState('');
 
   const reloadItems = useCallback(async () => {
     const next = await repository.listItems();
@@ -79,14 +83,7 @@ export function GroceryScreenContent({
     };
   }, [repository, recipesRepository]);
 
-  const sortedItems = useMemo(
-    () =>
-      [...items].sort((left, right) => {
-        if (left.isChecked !== right.isChecked) return left.isChecked ? 1 : -1;
-        return left.createdAt.localeCompare(right.createdAt);
-      }),
-    [items],
-  );
+  const sectionedItems = useMemo(() => groupItemsBySection(items), [items]);
 
   async function handleOpenPicker() {
     try {
@@ -148,7 +145,26 @@ export function GroceryScreenContent({
     }
   }
 
-  const checkedCount = sortedItems.filter((item) => item.isChecked).length;
+  function handleOpenAssign(item: GroceryItem) {
+    setAssigningItemId(item.localId);
+    setAssignInput(item.assignedTo ?? '');
+  }
+
+  async function handleConfirmAssign() {
+    if (!assigningItemId) return;
+    try {
+      const memberId = assignInput.trim() || null;
+      await repository.assignItem?.(assigningItemId, memberId);
+      await reloadItems();
+    } catch (error) {
+      setErrorMessage(toUserMessage(error));
+    } finally {
+      setAssigningItemId(null);
+      setAssignInput('');
+    }
+  }
+
+  const checkedCount = items.filter((item) => item.isChecked).length;
 
   return (
     <ScrollView
@@ -159,9 +175,9 @@ export function GroceryScreenContent({
       <View style={styles.header}>
         <Text style={styles.title}>Grocery</Text>
         <Text style={styles.subtitle}>
-          {sortedItems.length === 0
+          {items.length === 0
             ? 'Add ingredients you still need to buy.'
-            : `${sortedItems.length - checkedCount} to buy · ${checkedCount} in cart`}
+            : `${items.length - checkedCount} to buy · ${checkedCount} in cart`}
         </Text>
       </View>
 
@@ -197,24 +213,69 @@ export function GroceryScreenContent({
 
       {isLoading ? <ActivityIndicator color={KitchenDesign.colors.orange} /> : null}
 
-      {!isLoading && sortedItems.length === 0 ? (
+      {!isLoading && items.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No grocery items yet</Text>
           <Text style={styles.emptyHint}>
-            Tap “Add from a recipe” to pull missing ingredients from a saved recipe.
+            Tap &ldquo;Add from a recipe&rdquo; to pull missing ingredients from a saved recipe.
           </Text>
         </View>
       ) : null}
 
-      {sortedItems.map((item) => (
-        <GroceryRow
-          key={item.localId}
-          item={item}
-          onToggle={() => handleToggleChecked(item)}
-          onRemove={() => handleRemove(item)}
-        />
+      {[...sectionedItems.entries()].map(([section, sectionItems]) => (
+        <View key={section} style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>{section}</Text>
+          {sectionItems.map((item) => (
+            <GroceryRow
+              key={item.localId}
+              item={item}
+              onToggle={() => handleToggleChecked(item)}
+              onRemove={() => handleRemove(item)}
+              onAssign={() => handleOpenAssign(item)}
+            />
+          ))}
+        </View>
       ))}
 
+      {/* Assign modal */}
+      <Modal
+        visible={assigningItemId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAssigningItemId(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.assignSheet}>
+            <Text style={styles.modalTitle}>Assign to</Text>
+            <TextInput
+              style={styles.assignInput}
+              placeholder="Member name"
+              placeholderTextColor={KitchenDesign.colors.muted}
+              value={assignInput}
+              onChangeText={setAssignInput}
+              autoFocus
+              accessibilityLabel="Assignee name"
+            />
+            <View style={styles.assignActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel assignment"
+                onPress={() => setAssigningItemId(null)}
+                style={({ pressed }) => [styles.secondaryButton, pressed ? styles.pressed : null]}>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Confirm assignment"
+                onPress={handleConfirmAssign}
+                style={({ pressed }) => [styles.addButton, { flex: 0, paddingHorizontal: 20 }, pressed ? styles.pressed : null]}>
+                <Text style={styles.addButtonText}>Assign</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Recipe picker modal */}
       <Modal
         visible={isPickerOpen}
         transparent
@@ -275,9 +336,10 @@ type GroceryRowProps = {
   item: GroceryItem;
   onToggle: () => void;
   onRemove: () => void;
+  onAssign: () => void;
 };
 
-function GroceryRow({ item, onToggle, onRemove }: GroceryRowProps) {
+function GroceryRow({ item, onToggle, onRemove, onAssign }: GroceryRowProps) {
   const checkLabel = item.isChecked
     ? `Mark ${item.name} as not bought`
     : `Mark ${item.name} as bought`;
@@ -306,8 +368,17 @@ function GroceryRow({ item, onToggle, onRemove }: GroceryRowProps) {
         <Text style={styles.rowMeta} numberOfLines={1}>
           {formatQuantity(item)}
           {item.recipeTitle ? ` · ${item.recipeTitle}` : ''}
+          {item.assignedTo ? ` · ${item.assignedTo}` : ''}
         </Text>
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Assign ${item.name}`}
+        onPress={onAssign}
+        style={({ pressed }) => [styles.assignButton, pressed ? styles.pressed : null]}>
+        <User size={16} stroke={item.assignedTo ? KitchenDesign.colors.orange : KitchenDesign.colors.muted} />
+      </Pressable>
 
       <Pressable
         accessibilityRole="button"
@@ -457,6 +528,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  sectionContainer: {
+    gap: 8,
+  },
+  sectionHeader: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 15,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingVertical: 4,
+  },
   row: {
     minHeight: 64,
     borderRadius: KitchenDesign.radius.card,
@@ -506,6 +588,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  assignButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: KitchenDesign.colors.linen,
+    borderWidth: 1,
+    borderColor: KitchenDesign.colors.border,
+  },
   removeButton: {
     width: 44,
     height: 44,
@@ -534,6 +626,29 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 28,
     gap: 12,
+  },
+  assignSheet: {
+    backgroundColor: KitchenDesign.colors.cream,
+    borderTopLeftRadius: KitchenDesign.radius.sheet,
+    borderTopRightRadius: KitchenDesign.radius.sheet,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 28,
+    gap: 14,
+  },
+  assignInput: {
+    minHeight: 48,
+    borderRadius: KitchenDesign.radius.button,
+    borderWidth: 1,
+    borderColor: KitchenDesign.colors.border,
+    backgroundColor: KitchenDesign.colors.porcelain,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    color: KitchenDesign.colors.ink,
+  },
+  assignActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
   modalHeader: {
     flexDirection: 'row',

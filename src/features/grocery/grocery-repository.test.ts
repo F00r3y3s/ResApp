@@ -18,6 +18,8 @@ type Row = {
   recipe_id: string | null;
   recipe_title: string | null;
   is_checked: number;
+  section: string | null;
+  assigned_to: string | null;
   privacy: 'local-only';
   created_at: string;
   updated_at: string;
@@ -39,6 +41,8 @@ function createMemoryGroceryDatabase(): GroceryDatabase {
           recipeId,
           recipeTitle,
           isChecked,
+          section,
+          assignedTo,
           createdAt,
           updatedAt,
         ] = parameters;
@@ -54,6 +58,8 @@ function createMemoryGroceryDatabase(): GroceryDatabase {
             recipe_id: recipeId === null ? null : String(recipeId),
             recipe_title: recipeTitle === null ? null : String(recipeTitle),
             is_checked: Number(isChecked),
+            section: section === null || section === undefined ? null : String(section),
+            assigned_to: assignedTo === null || assignedTo === undefined ? null : String(assignedTo),
             privacy: 'local-only',
             created_at: String(createdAt),
             updated_at: String(updatedAt),
@@ -68,6 +74,26 @@ function createMemoryGroceryDatabase(): GroceryDatabase {
         rows = rows.map((r) =>
           r.local_id === String(localId)
             ? { ...r, is_checked: Number(isChecked), updated_at: String(updatedAt) }
+            : r,
+        );
+        return;
+      }
+
+      if (sql.startsWith('UPDATE grocery_items SET assigned_to')) {
+        const [assignedTo, updatedAt, localId] = parameters;
+        rows = rows.map((r) =>
+          r.local_id === String(localId)
+            ? { ...r, assigned_to: assignedTo === null ? null : String(assignedTo), updated_at: String(updatedAt) }
+            : r,
+        );
+        return;
+      }
+
+      if (sql.startsWith('UPDATE grocery_items SET section')) {
+        const [section, updatedAt, localId] = parameters;
+        rows = rows.map((r) =>
+          r.local_id === String(localId)
+            ? { ...r, section: String(section), updated_at: String(updatedAt) }
             : r,
         );
         return;
@@ -295,5 +321,86 @@ describe('grocery repository', () => {
     expect(result.added).toEqual([]);
     expect(result.alreadyHaveCount).toBe(3);
     await expect(repository.listItems()).resolves.toEqual([]);
+  });
+
+  it('auto-infers section when adding a recipe to the list', async () => {
+    counter = 0;
+    const repository = createGroceryRepository({
+      database: createMemoryGroceryDatabase(),
+      now: referenceNow,
+      createLocalId: sequentialLocalId,
+    });
+
+    await repository.addRecipeToList(recipe(), []);
+    const items = await repository.listItems();
+
+    const lentils = items.find((i) => i.name === 'Red lentils');
+    const cumin = items.find((i) => i.name === 'Cumin');
+    const garlic = items.find((i) => i.name === 'Garlic');
+
+    expect(lentils?.section).toBe('Pantry');
+    expect(cumin?.section).toBe('Spices');
+    expect(garlic?.section).toBe('Produce');
+  });
+
+  it('assigns an item to a household member and persists it', async () => {
+    counter = 0;
+    const repository = createGroceryRepository({
+      database: createMemoryGroceryDatabase(),
+      now: referenceNow,
+      createLocalId: sequentialLocalId,
+    });
+
+    await repository.addRecipeToList(recipe(), []);
+    const items = await repository.listItems();
+    const target = items[0];
+
+    expect(target.assignedTo).toBeNull();
+
+    await repository.assignItem!(target.localId, 'member-aisha');
+    const afterAssign = await repository.listItems();
+    const assigned = afterAssign.find((i) => i.localId === target.localId);
+    expect(assigned?.assignedTo).toBe('member-aisha');
+  });
+
+  it('unassigns an item by passing null', async () => {
+    counter = 0;
+    const repository = createGroceryRepository({
+      database: createMemoryGroceryDatabase(),
+      now: referenceNow,
+      createLocalId: sequentialLocalId,
+    });
+
+    await repository.addRecipeToList(recipe(), []);
+    const items = await repository.listItems();
+    const target = items[0];
+
+    await repository.assignItem!(target.localId, 'member-aisha');
+    await repository.assignItem!(target.localId, null);
+
+    const afterUnassign = await repository.listItems();
+    const item = afterUnassign.find((i) => i.localId === target.localId);
+    expect(item?.assignedTo).toBeNull();
+  });
+
+  it('overrides the section for an item', async () => {
+    counter = 0;
+    const repository = createGroceryRepository({
+      database: createMemoryGroceryDatabase(),
+      now: referenceNow,
+      createLocalId: sequentialLocalId,
+    });
+
+    await repository.addRecipeToList(recipe(), []);
+    const items = await repository.listItems();
+    const target = items.find((i) => i.name === 'Red lentils')!;
+
+    // Initially auto-inferred
+    expect(target.section).toBe('Pantry');
+
+    await repository.setSectionOverride!(target.localId, 'Other');
+    const afterOverride = await repository.listItems();
+    const overridden = afterOverride.find((i) => i.localId === target.localId);
+    expect(overridden?.section).toBe('Other');
   });
 });
