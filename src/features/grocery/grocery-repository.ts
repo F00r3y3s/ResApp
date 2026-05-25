@@ -1,7 +1,7 @@
 import type { PantryItem } from '@/features/pantry/pantry-repository';
 import type { Recipe } from '@/features/recipes/recipes-repository';
 
-import { normalizeIngredientName, subtractPantryFromRecipe } from './grocery-model';
+import { type GroceryItemDraft, normalizeIngredientName, subtractPantryFromRecipe } from './grocery-model';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -38,6 +38,7 @@ export type GroceryDatabase = {
 export type GroceryRepository = {
   listItems(): Promise<GroceryItem[]>;
   addRecipeToList(recipe: Recipe, pantryItems: PantryItem[]): Promise<AddRecipeToListResult>;
+  addMultipleToList(drafts: GroceryItemDraft[]): Promise<GroceryItem[]>;
   setChecked(localId: string, isChecked: boolean): Promise<void>;
   removeItem(localId: string): Promise<void>;
   clearChecked(): Promise<void>;
@@ -185,6 +186,88 @@ export function createGroceryRepository(
       }
 
       return { added, alreadyHaveCount, alreadyOnList };
+    },
+
+    async addMultipleToList(drafts) {
+      const existingRows = await database.getAll<GroceryItemRow>(
+        `SELECT
+          local_id,
+          name,
+          normalized_name,
+          quantity,
+          unit,
+          recipe_id,
+          recipe_title,
+          is_checked,
+          privacy,
+          created_at,
+          updated_at
+        FROM grocery_items
+        WHERE deleted_at IS NULL`,
+      );
+      const existingUncheckedNames = new Set(
+        existingRows
+          .filter((row) => row.is_checked === 0)
+          .map((row) => row.normalized_name),
+      );
+
+      const added: GroceryItem[] = [];
+
+      for (const draft of drafts) {
+        const normalizedName = draft.normalizedName || normalizeIngredientName(draft.name);
+        if (existingUncheckedNames.has(normalizedName)) {
+          continue;
+        }
+
+        const timestamp = now().toISOString();
+        const item: GroceryItem = {
+          localId: createLocalId(),
+          name: draft.name,
+          normalizedName,
+          quantity: draft.quantity,
+          unit: draft.unit,
+          recipeId: draft.recipeId,
+          recipeTitle: draft.recipeTitle,
+          isChecked: false,
+          privacy: 'local-only',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+
+        await database.execute(
+          `INSERT OR REPLACE INTO grocery_items (
+            local_id,
+            name,
+            normalized_name,
+            quantity,
+            unit,
+            recipe_id,
+            recipe_title,
+            is_checked,
+            privacy,
+            created_at,
+            updated_at,
+            deleted_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local-only', ?, ?, NULL)`,
+          [
+            item.localId,
+            item.name,
+            item.normalizedName,
+            item.quantity,
+            item.unit,
+            item.recipeId,
+            item.recipeTitle,
+            item.isChecked ? 1 : 0,
+            item.createdAt,
+            item.updatedAt,
+          ],
+        );
+
+        existingUncheckedNames.add(normalizedName);
+        added.push(item);
+      }
+
+      return added;
     },
 
     async setChecked(localId, isChecked) {

@@ -1,4 +1,4 @@
-import { Plus, X } from 'lucide-react-native';
+import { Plus, ShoppingCart, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -12,6 +12,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KitchenDesign } from '@/constants/kitchen-design';
+import type { GroceryItemDraft } from '@/features/grocery/grocery-model';
+import type { GroceryItem, GroceryRepository } from '@/features/grocery/grocery-repository';
+import type { PantryRepository } from '@/features/pantry/pantry-repository';
 import type { Recipe, RecipesRepository } from '@/features/recipes/recipes-repository';
 
 import {
@@ -27,10 +30,14 @@ import type {
     MealPlanRepository,
     MealSlot,
 } from './meal-plan-repository';
+import { PlanToGroceryScreenContent } from './plan-to-grocery-screen';
 
 type MealPlanScreenContentProps = {
   repository: MealPlanRepository;
   recipesRepository: RecipesRepository;
+  pantryRepository?: PantryRepository;
+  groceryRepository?: GroceryRepository;
+  onAddToGrocery?: (drafts: GroceryItemDraft[]) => Promise<GroceryItem[]>;
   now?: () => Date;
 };
 
@@ -43,6 +50,9 @@ type SelectedSlot = {
 export function MealPlanScreenContent({
   repository,
   recipesRepository,
+  pantryRepository,
+  groceryRepository,
+  onAddToGrocery,
   now,
 }: MealPlanScreenContentProps) {
   const insets = useSafeAreaInsets();
@@ -54,6 +64,7 @@ export function MealPlanScreenContent({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
   const [isPickerLoading, setIsPickerLoading] = useState(false);
+  const [isGroceryModalOpen, setIsGroceryModalOpen] = useState(false);
 
   const grid = useMemo(
     () => buildWeekGrid({ weekStartIso, entries }),
@@ -180,6 +191,45 @@ export function MealPlanScreenContent({
             />
           ))
         : null}
+
+      {!isLoading && entries.length > 0 && pantryRepository && groceryRepository ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Generate grocery list from plan"
+          onPress={() => setIsGroceryModalOpen(true)}
+          style={({ pressed }) => [styles.groceryButton, pressed ? styles.pressed : null]}>
+          <ShoppingCart size={20} stroke={KitchenDesign.colors.cream} />
+          <Text style={styles.groceryButtonText}>Generate grocery list</Text>
+        </Pressable>
+      ) : null}
+
+      <Modal
+        visible={isGroceryModalOpen}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={() => setIsGroceryModalOpen(false)}>
+        {pantryRepository && groceryRepository ? (
+          <View style={styles.groceryModalContainer}>
+            <View style={styles.groceryModalHeader}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close grocery preview"
+                onPress={() => setIsGroceryModalOpen(false)}
+                style={styles.modalCloseButton}>
+                <X size={22} stroke={KitchenDesign.colors.ink} />
+              </Pressable>
+            </View>
+            <PlanToGroceryScreenContent
+              mealPlanRepository={repository}
+              recipesRepository={recipesRepository}
+              pantryRepository={pantryRepository}
+              groceryRepository={groceryRepository}
+              onAddToGrocery={onAddToGrocery}
+              now={now}
+            />
+          </View>
+        ) : null}
+      </Modal>
 
       <Modal
         visible={selectedSlot !== null}
@@ -559,5 +609,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  groceryButton: {
+    minHeight: 52,
+    borderRadius: KitchenDesign.radius.button,
+    backgroundColor: KitchenDesign.colors.orange,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  groceryButtonText: {
+    color: KitchenDesign.colors.cream,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  groceryModalContainer: {
+    flex: 1,
+    backgroundColor: KitchenDesign.colors.cream,
+  },
+  groceryModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 18,
+    paddingTop: 12,
   },
 });

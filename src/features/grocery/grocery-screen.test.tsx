@@ -147,6 +147,28 @@ function createInMemoryGroceryRepository(initial: GroceryItem[] = []): GroceryRe
     async clearChecked() {
       items = items.filter((i) => !i.isChecked);
     },
+    async addMultipleToList(drafts) {
+      const added: GroceryItem[] = [];
+      for (const draft of drafts) {
+        counter += 1;
+        const next: GroceryItem = {
+          localId: `mem-${counter}`,
+          name: draft.name,
+          normalizedName: draft.normalizedName,
+          quantity: draft.quantity,
+          unit: draft.unit,
+          recipeId: draft.recipeId,
+          recipeTitle: draft.recipeTitle,
+          isChecked: false,
+          privacy: 'local-only',
+          createdAt: stamp,
+          updatedAt: stamp,
+        };
+        items.push(next);
+        added.push(next);
+      }
+      return added;
+    },
   };
 }
 

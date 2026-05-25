@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import type { Recipe, RecipesRepository } from '@/features/recipes/recipes-repository';
 import { SEED_RECIPES } from '@/features/recipes/seed-recipes';
@@ -162,5 +162,109 @@ describe('CookModeScreenContent', () => {
     render(<CookModeScreenContent recipeId="seed-zzz" repository={repo} />);
 
     await screen.findByText("We couldn't find that recipe");
+  });
+
+  describe('timer integration', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows a "Start timer" button on a step with timerMinutes', async () => {
+      render(<CookModeScreenContent recipeId="seed-001" repository={makeRepo()} />);
+      await screen.findByText('Step 1 of 7');
+
+      // Step 1 has no timer
+      expect(screen.queryByText('Start timer')).toBeNull();
+
+      // Navigate to step 4 which has timerMinutes: 5
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      await screen.findByText('Step 4 of 7');
+
+      expect(screen.getByText('Start timer')).toBeTruthy();
+    });
+
+    it('starts the timer and shows countdown when "Start timer" is pressed', async () => {
+      render(<CookModeScreenContent recipeId="seed-001" repository={makeRepo()} />);
+      await screen.findByText('Step 1 of 7');
+
+      // Navigate to step 4 (timerMinutes: 5 → 300 seconds → 05:00)
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      await screen.findByText('Step 4 of 7');
+
+      fireEvent.press(screen.getByText('Start timer'));
+
+      // Should show 05:00 initially
+      expect(screen.getByText('05:00')).toBeTruthy();
+      // Should show a Pause button
+      expect(screen.getByText('Pause')).toBeTruthy();
+    });
+
+    it('pauses the timer when Pause is pressed', async () => {
+      render(<CookModeScreenContent recipeId="seed-001" repository={makeRepo()} />);
+      await screen.findByText('Step 1 of 7');
+
+      // Navigate to step 4
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      await screen.findByText('Step 4 of 7');
+
+      fireEvent.press(screen.getByText('Start timer'));
+      expect(screen.getByText('05:00')).toBeTruthy();
+
+      // Advance 3 seconds
+      act(() => {
+        jest.advanceTimersByTime(3000);
+      });
+      expect(screen.getByText('04:57')).toBeTruthy();
+
+      // Pause
+      fireEvent.press(screen.getByText('Pause'));
+      expect(screen.getByText('Resume')).toBeTruthy();
+
+      // Time should not advance while paused
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(screen.getByText('04:57')).toBeTruthy();
+    });
+
+    it('shows an in-app alert when the timer finishes', async () => {
+      render(<CookModeScreenContent recipeId="seed-001" repository={makeRepo()} />);
+      await screen.findByText('Step 1 of 7');
+
+      // Navigate to step 4 (timerMinutes: 5 → 300 seconds)
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      fireEvent.press(screen.getByLabelText('Next step'));
+      await screen.findByText('Step 4 of 7');
+
+      fireEvent.press(screen.getByText('Start timer'));
+
+      // Advance the full 5 minutes
+      act(() => {
+        jest.advanceTimersByTime(300_000);
+      });
+
+      expect(screen.getByText('00:00')).toBeTruthy();
+      expect(screen.getByText("Time's up!")).toBeTruthy();
+    });
+  });
+
+  describe('conversion modal', () => {
+    it('shows a Convert button on the cook mode screen', async () => {
+      render(<CookModeScreenContent recipeId="seed-001" repository={makeRepo()} />);
+      await screen.findByText('Step 1 of 7');
+
+      expect(screen.getByLabelText('Open unit converter')).toBeTruthy();
+    });
   });
 });

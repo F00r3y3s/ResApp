@@ -113,6 +113,20 @@ export default function GuestTabsLayout() {
           title: 'Sync consent',
         }}
       />
+      <Tabs.Screen
+        name="creators"
+        options={{
+          href: null,
+          title: 'Creators',
+        }}
+      />
+      <Tabs.Screen
+        name="smart-chef"
+        options={{
+          href: null,
+          title: 'Smart Chef',
+        }}
+      />
     </Tabs>
   );
 }

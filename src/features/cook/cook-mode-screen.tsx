@@ -4,10 +4,12 @@ import { ArrowLeft, ChefHat, ChevronLeft, ChevronRight } from 'lucide-react-nati
 import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
+    Modal,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KitchenDesign } from '@/constants/kitchen-design';
 import type { Recipe, RecipesRepository } from '@/features/recipes/recipes-repository';
 
+import { convert, getCompatibleUnits, SUPPORTED_UNITS, type Unit } from './conversions';
 import {
     createCookModeState,
     isFirstStep,
@@ -25,6 +28,8 @@ import {
     progressLabel,
     type CookModeState,
 } from './cook-mode-model';
+import { formatTimeRemaining } from './timer-model';
+import { useCountdownTimer } from './use-countdown-timer';
 
 const KEEP_AWAKE_TAG = 'family-ai-kitchen-cook-mode';
 
@@ -39,6 +44,7 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cookState, setCookState] = useState<CookModeState>(() => createCookModeState(0));
+  const [showConverter, setShowConverter] = useState(false);
 
   // Load the recipe.
   useEffect(() => {
@@ -90,6 +96,10 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
     if (!recipe) return null;
     return recipe.steps[cookState.currentIndex] ?? null;
   }, [recipe, cookState.currentIndex]);
+
+  const timerDurationSeconds = currentStep?.timerMinutes ? currentStep.timerMinutes * 60 : 0;
+  const { state: timerState, isTimerFinished, start: startCountdown, pause: pauseCountdown, reset: resetCountdown } =
+    useCountdownTimer(timerDurationSeconds);
 
   if (isLoading) {
     return (
@@ -161,11 +171,13 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
           {currentStep ? currentStep.instruction : 'This recipe has no steps yet.'}
         </Text>
         {currentStep?.timerMinutes ? (
-          <View style={styles.timerHint}>
-            <Text style={styles.timerHintText}>
-              ⏲  About {currentStep.timerMinutes} min
-            </Text>
-          </View>
+          <TimerWidget
+            timerState={timerState}
+            isTimerFinished={isTimerFinished}
+            onStart={startCountdown}
+            onPause={pauseCountdown}
+            onReset={resetCountdown}
+          />
         ) : null}
       </ScrollView>
 
@@ -174,6 +186,16 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
           {errorMessage}
         </Text>
       ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open unit converter"
+        onPress={() => setShowConverter(true)}
+        style={({ pressed }) => [styles.convertButton, pressed ? styles.pressed : null]}>
+        <Text style={styles.convertButtonText}>Convert</Text>
+      </Pressable>
+
+      <ConversionModal visible={showConverter} onClose={() => setShowConverter(false)} />
 
       <View style={[styles.controlsRow, { paddingBottom: Math.max(insets.bottom, 18) }]}>
         <Pressable
@@ -227,6 +249,172 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
         </Pressable>
       </View>
     </View>
+  );
+}
+
+/**
+ * Timer widget shown on steps with timerMinutes.
+ * Displays start/pause/resume controls and a countdown.
+ * Shows an in-app "Time's up!" alert when finished.
+ *
+ * NOTE: Local/push notifications are a follow-up enhancement.
+ * This slice uses an in-app banner to keep setup minimal and testable.
+ */
+function TimerWidget({
+  timerState,
+  isTimerFinished,
+  onStart,
+  onPause,
+  onReset,
+}: {
+  timerState: { remaining: number; status: string };
+  isTimerFinished: boolean;
+  onStart: () => void;
+  onPause: () => void;
+  onReset: () => void;
+}) {
+  if (timerState.status === 'idle') {
+    return (
+      <View style={styles.timerContainer}>
+        <Text style={styles.timerDisplay}>{formatTimeRemaining(timerState.remaining)}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onStart}
+          style={({ pressed }) => [styles.timerButton, styles.timerStartButton, pressed ? styles.pressed : null]}>
+          <Text style={styles.timerButtonText}>Start timer</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (isTimerFinished) {
+    return (
+      <View style={styles.timerContainer}>
+        <View style={styles.timerAlert}>
+          <Text style={styles.timerAlertText}>Time&apos;s up!</Text>
+        </View>
+        <Text style={styles.timerDisplay}>{formatTimeRemaining(timerState.remaining)}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onReset}
+          style={({ pressed }) => [styles.timerButton, styles.timerResetButton, pressed ? styles.pressed : null]}>
+          <Text style={styles.timerResetButtonText}>Reset</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const isPaused = timerState.status === 'paused';
+
+  return (
+    <View style={styles.timerContainer}>
+      <Text style={styles.timerDisplay}>{formatTimeRemaining(timerState.remaining)}</Text>
+      <View style={styles.timerButtonRow}>
+        {isPaused ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onStart}
+            style={({ pressed }) => [styles.timerButton, styles.timerStartButton, pressed ? styles.pressed : null]}>
+            <Text style={styles.timerButtonText}>Resume</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onPause}
+            style={({ pressed }) => [styles.timerButton, styles.timerPauseButton, pressed ? styles.pressed : null]}>
+            <Text style={styles.timerPauseButtonText}>Pause</Text>
+          </Pressable>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          onPress={onReset}
+          style={({ pressed }) => [styles.timerButton, styles.timerResetButton, pressed ? styles.pressed : null]}>
+          <Text style={styles.timerResetButtonText}>Reset</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Modal for unit conversions.
+ * Supports volume, weight, and temperature conversions.
+ */
+function ConversionModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const [inputValue, setInputValue] = useState('1');
+  const [fromUnit, setFromUnit] = useState<Unit>('cups');
+  const [toUnit, setToUnit] = useState<Unit>('ml');
+
+  const compatibleUnits = useMemo(() => getCompatibleUnits(fromUnit), [fromUnit]);
+
+  // When fromUnit changes, ensure toUnit is compatible
+  useEffect(() => {
+    const compatible = getCompatibleUnits(fromUnit);
+    if (!compatible.includes(toUnit)) {
+      setToUnit(compatible[0] ?? 'ml');
+    }
+  }, [fromUnit, toUnit]);
+
+  const numericValue = parseFloat(inputValue) || 0;
+  const result = convert(numericValue, fromUnit, toUnit);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Unit Converter</Text>
+
+          <View style={styles.converterRow}>
+            <TextInput
+              style={styles.converterInput}
+              value={inputValue}
+              onChangeText={setInputValue}
+              keyboardType="numeric"
+              accessibilityLabel="Conversion input value"
+            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitPicker}>
+              {SUPPORTED_UNITS.map((unit) => (
+                <Pressable
+                  key={unit}
+                  onPress={() => setFromUnit(unit)}
+                  style={[styles.unitChip, fromUnit === unit ? styles.unitChipActive : null]}>
+                  <Text style={[styles.unitChipText, fromUnit === unit ? styles.unitChipTextActive : null]}>
+                    {unit}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <Text style={styles.converterArrow}>↓</Text>
+
+          <View style={styles.converterRow}>
+            <Text style={styles.converterResult}>
+              {result !== null ? result.toFixed(2) : '—'}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitPicker}>
+              {compatibleUnits.map((unit) => (
+                <Pressable
+                  key={unit}
+                  onPress={() => setToUnit(unit)}
+                  style={[styles.unitChip, toUnit === unit ? styles.unitChipActive : null]}>
+                  <Text style={[styles.unitChipText, toUnit === unit ? styles.unitChipTextActive : null]}>
+                    {unit}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={onClose}
+            style={({ pressed }) => [styles.modalCloseButton, pressed ? styles.pressed : null]}>
+            <Text style={styles.modalCloseButtonText}>Done</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -333,6 +521,167 @@ const styles = StyleSheet.create({
     color: KitchenDesign.colors.ink,
     fontSize: 15,
     fontWeight: '800',
+  },
+  timerContainer: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: KitchenDesign.colors.linen,
+  },
+  timerDisplay: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: KitchenDesign.colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  timerButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timerButton: {
+    minHeight: 44,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerStartButton: {
+    backgroundColor: KitchenDesign.colors.orange,
+  },
+  timerPauseButton: {
+    backgroundColor: KitchenDesign.colors.porcelain,
+    borderColor: KitchenDesign.colors.border,
+    borderWidth: 1,
+  },
+  timerResetButton: {
+    backgroundColor: KitchenDesign.colors.porcelain,
+    borderColor: KitchenDesign.colors.border,
+    borderWidth: 1,
+  },
+  timerButtonText: {
+    color: KitchenDesign.colors.cream,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  timerPauseButtonText: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  timerResetButtonText: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  timerAlert: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: KitchenDesign.radius.pill,
+    backgroundColor: KitchenDesign.colors.orange,
+  },
+  timerAlertText: {
+    color: KitchenDesign.colors.cream,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  convertButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: KitchenDesign.colors.porcelain,
+    borderColor: KitchenDesign.colors.border,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  convertButtonText: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: KitchenDesign.colors.cream,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    gap: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: KitchenDesign.colors.ink,
+    textAlign: 'center',
+  },
+  converterRow: {
+    gap: 10,
+  },
+  converterInput: {
+    borderWidth: 1,
+    borderColor: KitchenDesign.colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 18,
+    fontWeight: '700',
+    color: KitchenDesign.colors.ink,
+    backgroundColor: KitchenDesign.colors.porcelain,
+  },
+  converterResult: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: KitchenDesign.colors.ink,
+    paddingVertical: 8,
+  },
+  converterArrow: {
+    fontSize: 24,
+    textAlign: 'center',
+    color: KitchenDesign.colors.muted,
+  },
+  unitPicker: {
+    flexDirection: 'row',
+  },
+  unitChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: KitchenDesign.radius.pill,
+    backgroundColor: KitchenDesign.colors.porcelain,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: KitchenDesign.colors.border,
+  },
+  unitChipActive: {
+    backgroundColor: KitchenDesign.colors.orange,
+    borderColor: KitchenDesign.colors.orange,
+  },
+  unitChipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: KitchenDesign.colors.ink,
+  },
+  unitChipTextActive: {
+    color: KitchenDesign.colors.cream,
+  },
+  modalCloseButton: {
+    minHeight: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: KitchenDesign.colors.orange,
+    marginTop: 8,
+  },
+  modalCloseButtonText: {
+    color: KitchenDesign.colors.cream,
+    fontSize: 17,
+    fontWeight: '900',
   },
   controlsRow: {
     flexDirection: 'row',
