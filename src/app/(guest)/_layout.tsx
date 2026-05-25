@@ -72,7 +72,6 @@ export default function GuestTabsLayout() {
       <Tabs.Screen
         name="pantry"
         options={{
-          href: null,
           title: 'Pantry',
           tabBarIcon: ({ color, size }) => <Wheat size={size} stroke={color} />,
         }}

@@ -1,22 +1,24 @@
 import {
-  Barcode,
-  ChevronRight,
-  Plus,
-  Search,
-  Snowflake,
-  UserCircle,
-  Warehouse,
+    Barcode,
+    ChevronRight,
+    PencilLine,
+    Plus,
+    Search,
+    Snowflake,
+    Trash2,
+    UserCircle,
+    Warehouse
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -44,6 +46,11 @@ type PantryGroup = {
   tone: 'danger' | 'warning' | 'muted';
   items: PantryItem[];
 };
+
+type EditingState = {
+  localId: string;
+  form: PantryFormState;
+} | null;
 
 const initialFormState: PantryFormState = {
   name: '',
@@ -73,6 +80,7 @@ export function PantryScreenContent({ repository }: PantryScreenContentProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editing, setEditing] = useState<EditingState>(null);
 
   const groups = useMemo(() => groupPantryItems(items), [items]);
 
@@ -112,6 +120,7 @@ export function PantryScreenContent({ repository }: PantryScreenContentProps) {
   async function handleAddItem() {
     if (!isFormOpen) {
       setIsFormOpen(true);
+      setEditing(null);
       return;
     }
 
@@ -133,6 +142,58 @@ export function PantryScreenContent({ repository }: PantryScreenContentProps) {
       setErrorMessage(toUserMessage(error));
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  function handleEditItem(item: PantryItem) {
+    setEditing({
+      localId: item.localId,
+      form: {
+        name: item.name,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        location: item.location,
+        expiresAt: item.expiresAt ?? '',
+      },
+    });
+    setIsFormOpen(false);
+    setErrorMessage(null);
+  }
+
+  async function handleSaveEdit() {
+    if (!editing) return;
+
+    setIsSaving(true);
+    setErrorMessage(null);
+
+    try {
+      await repository.updateItem(editing.localId, {
+        name: editing.form.name,
+        quantity: editing.form.quantity,
+        unit: editing.form.unit,
+        location: editing.form.location,
+        expiresAt: editing.form.expiresAt,
+      });
+      setEditing(null);
+      await refreshItems();
+    } catch (error) {
+      setErrorMessage(toUserMessage(error));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteItem(item: PantryItem) {
+    setErrorMessage(null);
+
+    try {
+      await repository.deleteItem(item.localId);
+      if (editing?.localId === item.localId) {
+        setEditing(null);
+      }
+      await refreshItems();
+    } catch (error) {
+      setErrorMessage(toUserMessage(error));
     }
   }
 
@@ -241,9 +302,103 @@ export function PantryScreenContent({ repository }: PantryScreenContentProps) {
         </View>
       ) : null}
 
+      {editing ? (
+        <View style={styles.formPanel}>
+          <Text style={styles.editFormTitle}>Edit item</Text>
+          <View style={styles.formRow}>
+            <LabeledInput
+              label="Name"
+              value={editing.form.name}
+              placeholder="Brown rice"
+              onChangeText={(name) =>
+                setEditing((current) =>
+                  current ? { ...current, form: { ...current.form, name } } : null,
+                )
+              }
+            />
+            <LabeledInput
+              label="Quantity"
+              value={editing.form.quantity}
+              placeholder="2"
+              keyboardType="decimal-pad"
+              onChangeText={(quantity) =>
+                setEditing((current) =>
+                  current ? { ...current, form: { ...current.form, quantity } } : null,
+                )
+              }
+            />
+          </View>
+          <View style={styles.formRow}>
+            <LabeledInput
+              label="Unit"
+              value={editing.form.unit}
+              placeholder="bags"
+              onChangeText={(unit) =>
+                setEditing((current) =>
+                  current ? { ...current, form: { ...current.form, unit } } : null,
+                )
+              }
+            />
+            <LabeledInput
+              label="Location"
+              value={editing.form.location}
+              placeholder="Pantry"
+              onChangeText={(location) =>
+                setEditing((current) =>
+                  current ? { ...current, form: { ...current.form, location } } : null,
+                )
+              }
+            />
+          </View>
+          <LabeledInput
+            label="Expiry"
+            value={editing.form.expiresAt}
+            placeholder="YYYY-MM-DD"
+            onChangeText={(expiresAt) =>
+              setEditing((current) =>
+                current ? { ...current, form: { ...current.form, expiresAt } } : null,
+              )
+            }
+          />
+          {errorMessage ? (
+            <Text selectable style={styles.errorText}>
+              {errorMessage}
+            </Text>
+          ) : null}
+          <View style={styles.editActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setEditing(null)}
+              style={({ pressed }) => [styles.cancelButton, pressed ? styles.pressed : null]}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSaving }}
+              disabled={isSaving}
+              onPress={handleSaveEdit}
+              style={({ pressed }) => [
+                styles.saveButton,
+                pressed && !isSaving ? styles.pressed : null,
+                isSaving ? styles.disabled : null,
+              ]}>
+              {isSaving ? (
+                <ActivityIndicator color={KitchenDesign.colors.cream} />
+              ) : null}
+              <Text style={styles.saveButtonText}>Save changes</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       {groups.map((group) =>
         group.items.length > 0 ? (
-          <PantrySection key={group.title} group={group} />
+          <PantrySection
+            key={group.title}
+            group={group}
+            onEdit={handleEditItem}
+            onDelete={handleDeleteItem}
+          />
         ) : null,
       )}
 
@@ -264,7 +419,15 @@ export function PantryScreenContent({ repository }: PantryScreenContentProps) {
   );
 }
 
-function PantrySection({ group }: { group: PantryGroup }) {
+function PantrySection({
+  group,
+  onEdit,
+  onDelete,
+}: {
+  group: PantryGroup;
+  onEdit: (item: PantryItem) => void;
+  onDelete: (item: PantryItem) => void;
+}) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -282,6 +445,8 @@ function PantrySection({ group }: { group: PantryGroup }) {
             key={item.localId}
             item={item}
             showDivider={index < group.items.length - 1}
+            onEdit={onEdit}
+            onDelete={onDelete}
           />
         ))}
       </View>
@@ -289,7 +454,17 @@ function PantrySection({ group }: { group: PantryGroup }) {
   );
 }
 
-function PantryItemRow({ item, showDivider }: { item: PantryItem; showDivider: boolean }) {
+function PantryItemRow({
+  item,
+  showDivider,
+  onEdit,
+  onDelete,
+}: {
+  item: PantryItem;
+  showDivider: boolean;
+  onEdit: (item: PantryItem) => void;
+  onDelete: (item: PantryItem) => void;
+}) {
   const details = getItemDetails(item);
   const locationTone = getLocationTone(item.location);
 
@@ -323,6 +498,22 @@ function PantryItemRow({ item, showDivider }: { item: PantryItem; showDivider: b
         <Text selectable style={styles.expiryText}>
           {formatExpiry(item.expiresAt)}
         </Text>
+      </View>
+      <View style={styles.itemActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${item.name}`}
+          onPress={() => onEdit(item)}
+          style={({ pressed }) => [styles.actionButton, pressed ? styles.pressed : null]}>
+          <PencilLine size={18} stroke={KitchenDesign.colors.muted} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${item.name}`}
+          onPress={() => onDelete(item)}
+          style={({ pressed }) => [styles.actionButton, pressed ? styles.pressed : null]}>
+          <Trash2 size={18} stroke={KitchenDesign.colors.danger} />
+        </Pressable>
       </View>
     </View>
   );
@@ -818,6 +1009,43 @@ const styles = StyleSheet.create({
     fontSize: 25,
     lineHeight: 31,
     fontWeight: '900',
+  },
+  itemActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: KitchenDesign.colors.cream,
+    borderColor: KitchenDesign.colors.border,
+    borderWidth: 1,
+  },
+  editFormTitle: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: KitchenDesign.colors.border,
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 18,
+    fontWeight: '800',
   },
   pressed: {
     opacity: 0.84,

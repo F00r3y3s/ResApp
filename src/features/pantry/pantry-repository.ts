@@ -61,6 +61,8 @@ export type PantryRepositoryOptions = {
 
 export type PantryRepository = {
   addItem(input: PantryItemInput): Promise<PantryItem>;
+  updateItem(localId: string, input: PantryItemInput): Promise<PantryItem>;
+  deleteItem(localId: string): Promise<void>;
   listItems(): Promise<PantryItem[]>;
 };
 
@@ -129,6 +131,51 @@ export function createPantryRepository(options: PantryRepositoryOptions): Pantry
       );
 
       return rows.map(mapPantryItemRow);
+    },
+
+    async updateItem(localId, input) {
+      const parsed = pantryItemInputSchema.parse(input);
+      const timestamp = now().toISOString();
+      const name = normalizeWhitespace(parsed.name);
+      const normalizedName = normalizeName(parsed.name);
+
+      await database.execute(
+        `UPDATE pantry_items
+         SET name = ?, normalized_name = ?, quantity = ?, unit = ?, location = ?, expires_at = ?, updated_at = ?
+         WHERE local_id = ? AND deleted_at IS NULL`,
+        [
+          name,
+          normalizedName,
+          parsed.quantity,
+          normalizeWhitespace(parsed.unit),
+          normalizeWhitespace(parsed.location),
+          parsed.expiresAt,
+          timestamp,
+          localId,
+        ],
+      );
+
+      return {
+        localId,
+        name,
+        normalizedName,
+        quantity: parsed.quantity,
+        unit: normalizeWhitespace(parsed.unit),
+        location: normalizeWhitespace(parsed.location),
+        expiresAt: parsed.expiresAt,
+        privacy: 'local-only' as const,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+    },
+
+    async deleteItem(localId) {
+      const timestamp = now().toISOString();
+
+      await database.execute(
+        `UPDATE pantry_items SET deleted_at = ? WHERE local_id = ? AND deleted_at IS NULL`,
+        [timestamp, localId],
+      );
     },
   };
 }
