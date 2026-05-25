@@ -1,7 +1,7 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
-import { ArrowLeft, ChefHat, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, ChefHat, ChevronLeft, ChevronRight, Mic, MicOff } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Modal,
@@ -10,7 +10,7 @@ import {
     StyleSheet,
     Text,
     TextInput,
-    View,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,21 +30,48 @@ import {
 } from './cook-mode-model';
 import { formatTimeRemaining } from './timer-model';
 import { useCountdownTimer } from './use-countdown-timer';
+import { useVoiceCookControls } from './use-voice-cook-controls';
+import type { VoiceController } from './voice-controller';
 
 const KEEP_AWAKE_TAG = 'family-ai-kitchen-cook-mode';
 
 type CookModeScreenContentProps = {
   recipeId: string;
   repository: RecipesRepository;
+  /** Optional voice controller. Pass null to disable voice (default). */
+  voiceController?: VoiceController | null;
 };
 
-export function CookModeScreenContent({ recipeId, repository }: CookModeScreenContentProps) {
+export function CookModeScreenContent({ recipeId, repository, voiceController = null }: CookModeScreenContentProps) {
   const insets = useSafeAreaInsets();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cookState, setCookState] = useState<CookModeState>(() => createCookModeState(0));
   const [showConverter, setShowConverter] = useState(false);
+  const [repeatFlash, setRepeatFlash] = useState(false);
+
+  // Stable refs for voice callbacks that reference current cookState.
+  const handleNext = useCallback(() => setCookState((s) => nextStep(s)), []);
+  const handleBack = useCallback(() => setCookState((s) => prevStep(s)), []);
+  const handleRepeat = useCallback(() => {
+    // Flash/highlight the step text to indicate "repeat".
+    setRepeatFlash(true);
+    setTimeout(() => setRepeatFlash(false), 1200);
+  }, []);
+
+  const {
+    isListening,
+    isPermissionDenied,
+    isVoiceAvailable,
+    startVoice,
+    stopVoice,
+  } = useVoiceCookControls({
+    controller: voiceController,
+    onNext: handleNext,
+    onBack: handleBack,
+    onRepeat: handleRepeat,
+  });
 
   // Load the recipe.
   useEffect(() => {
@@ -147,7 +174,26 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
           </Text>
           <Text style={styles.progressLabel}>{progressLabel(cookState)}</Text>
         </View>
-        <View style={styles.iconButtonPlaceholder} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            isListening ? 'Stop voice control' : 'Start voice control'
+          }
+          accessibilityState={{ disabled: !isVoiceAvailable }}
+          disabled={!isVoiceAvailable}
+          onPress={isListening ? stopVoice : startVoice}
+          style={({ pressed }) => [
+            styles.iconButton,
+            isListening ? styles.micActiveButton : null,
+            !isVoiceAvailable ? styles.disabledButton : null,
+            pressed && isVoiceAvailable ? styles.pressed : null,
+          ]}>
+          {isListening ? (
+            <Mic size={22} stroke={KitchenDesign.colors.cream} />
+          ) : (
+            <MicOff size={22} stroke={isVoiceAvailable ? KitchenDesign.colors.ink : KitchenDesign.colors.muted} />
+          )}
+        </Pressable>
       </View>
 
       <View
@@ -156,6 +202,19 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
         style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${Math.max(0, fraction * 100)}%` }]} />
       </View>
+
+      {isListening ? (
+        <View style={styles.listeningBanner}>
+          <Mic size={16} stroke={KitchenDesign.colors.cream} />
+          <Text style={styles.listeningText}>Listening...</Text>
+        </View>
+      ) : null}
+
+      {isPermissionDenied ? (
+        <Text style={styles.permissionDeniedText}>
+          Voice unavailable — microphone permission denied
+        </Text>
+      ) : null}
 
       <ScrollView
         style={styles.stepScroll}
@@ -167,7 +226,7 @@ export function CookModeScreenContent({ recipeId, repository }: CookModeScreenCo
             {currentStep ? `Step ${currentStep.order}` : 'No steps'}
           </Text>
         </View>
-        <Text style={styles.stepInstruction}>
+        <Text style={[styles.stepInstruction, repeatFlash ? styles.stepInstructionFlash : null]}>
           {currentStep ? currentStep.instruction : 'This recipe has no steps yet.'}
         </Text>
         {currentStep?.timerMinutes ? (
@@ -446,10 +505,6 @@ const styles = StyleSheet.create({
     backgroundColor: KitchenDesign.colors.porcelain,
     borderColor: KitchenDesign.colors.border,
     borderWidth: 1,
-  },
-  iconButtonPlaceholder: {
-    width: 44,
-    height: 44,
   },
   titleBlock: {
     flex: 1,
@@ -755,5 +810,37 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.84,
+  },
+  micActiveButton: {
+    backgroundColor: KitchenDesign.colors.orange,
+    borderColor: KitchenDesign.colors.orange,
+  },
+  listeningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: KitchenDesign.radius.pill,
+    backgroundColor: KitchenDesign.colors.orange,
+  },
+  listeningText: {
+    color: KitchenDesign.colors.cream,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  permissionDeniedText: {
+    color: KitchenDesign.colors.danger,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  stepInstructionFlash: {
+    backgroundColor: KitchenDesign.colors.linen,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
 });
