@@ -1,9 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+    detectPantryDuplicates,
     LOW_CONFIDENCE_THRESHOLD,
     parseDetectedItems,
-    type ScanParseResponse,
+    type DetectedItem,
+    type ScanParseResponse
 } from './detected-item';
 
 describe('parseDetectedItems', () => {
@@ -96,6 +98,17 @@ describe('parseDetectedItems', () => {
     expect(items[0].location).toBe('Pantry');
     expect(items[0].expiresAt).toBe('');
     expect(items[0].isIncluded).toBe(true);
+    expect(items[0].destination).toBe('pantry');
+  });
+
+  it('uses provided default destination', () => {
+    const response: ScanParseResponse = {
+      items: [{ name: 'Milk', confidence: 0.9 }],
+    };
+
+    const items = parseDetectedItems(response, 'grocery');
+
+    expect(items[0].destination).toBe('grocery');
   });
 
   it('normalizes location values', () => {
@@ -141,5 +154,98 @@ describe('parseDetectedItems', () => {
 
     expect(items[0].confidence).toBe(0);
     expect(items[1].confidence).toBe(0);
+  });
+});
+
+
+describe('detectPantryDuplicates', () => {
+  function buildItem(overrides: Partial<DetectedItem> = {}): DetectedItem {
+    return {
+      id: 'detected-1',
+      name: 'Milk',
+      confidence: 0.9,
+      quantity: '1',
+      unit: 'gallon',
+      location: 'Fridge',
+      expiresAt: '',
+      isIncluded: true,
+      destination: 'pantry',
+      ...overrides,
+    };
+  }
+
+  it('finds exact name matches in existing pantry', () => {
+    const detected = [buildItem({ id: 'a', name: 'Milk', destination: 'pantry' })];
+    const existing = [{ localId: 'pan-1', name: 'Milk', normalizedName: 'milk' }];
+
+    const dupes = detectPantryDuplicates(detected, existing);
+
+    expect(dupes).toHaveLength(1);
+    expect(dupes[0].detectedItemId).toBe('a');
+    expect(dupes[0].existingLocalId).toBe('pan-1');
+  });
+
+  it('matches case-insensitively and ignores whitespace', () => {
+    const detected = [buildItem({ id: 'a', name: '  MILK  ', destination: 'pantry' })];
+    const existing = [{ localId: 'pan-1', name: 'Milk', normalizedName: 'milk' }];
+
+    const dupes = detectPantryDuplicates(detected, existing);
+
+    expect(dupes).toHaveLength(1);
+  });
+
+  it('returns empty when no duplicates exist', () => {
+    const detected = [buildItem({ id: 'a', name: 'Bread' })];
+    const existing = [{ localId: 'pan-1', name: 'Milk', normalizedName: 'milk' }];
+
+    const dupes = detectPantryDuplicates(detected, existing);
+
+    expect(dupes).toEqual([]);
+  });
+
+  it('skips items not destined for pantry', () => {
+    const detected = [buildItem({ id: 'a', name: 'Milk', destination: 'grocery' })];
+    const existing = [{ localId: 'pan-1', name: 'Milk', normalizedName: 'milk' }];
+
+    const dupes = detectPantryDuplicates(detected, existing);
+
+    expect(dupes).toEqual([]);
+  });
+
+  it('skips items not marked as included', () => {
+    const detected = [
+      buildItem({ id: 'a', name: 'Milk', isIncluded: false }),
+    ];
+    const existing = [{ localId: 'pan-1', name: 'Milk', normalizedName: 'milk' }];
+
+    const dupes = detectPantryDuplicates(detected, existing);
+
+    expect(dupes).toEqual([]);
+  });
+
+  it('detects multiple duplicates', () => {
+    const detected = [
+      buildItem({ id: 'a', name: 'Milk' }),
+      buildItem({ id: 'b', name: 'Eggs' }),
+      buildItem({ id: 'c', name: 'New Item' }),
+    ];
+    const existing = [
+      { localId: 'pan-1', name: 'Milk', normalizedName: 'milk' },
+      { localId: 'pan-2', name: 'Eggs', normalizedName: 'eggs' },
+    ];
+
+    const dupes = detectPantryDuplicates(detected, existing);
+
+    expect(dupes).toHaveLength(2);
+    expect(dupes.map((d) => d.detectedItemId).sort()).toEqual(['a', 'b']);
+  });
+
+  it('skips items with empty names', () => {
+    const detected = [buildItem({ id: 'a', name: '   ' })];
+    const existing = [{ localId: 'pan-1', name: 'Milk', normalizedName: 'milk' }];
+
+    const dupes = detectPantryDuplicates(detected, existing);
+
+    expect(dupes).toEqual([]);
   });
 });

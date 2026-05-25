@@ -5,7 +5,12 @@
  * image, with confidence scores and best-effort metadata (quantity, unit,
  * location, expiry). The user confirms each item before it lands in the
  * pantry repository (T8.2 acceptance: "User must confirm before saving").
+ *
+ * For receipt scans (T8.3), each item also has a `destination` so the user
+ * can route it to either pantry or grocery list.
  */
+export type DetectedItemDestination = 'pantry' | 'grocery';
+
 export type DetectedItem = {
   /** Stable client-side id for list editing. */
   id: string;
@@ -23,6 +28,8 @@ export type DetectedItem = {
   expiresAt: string;
   /** True if the user has marked this item to be saved. Defaults to true. */
   isIncluded: boolean;
+  /** Where to save this item. Defaults to 'pantry' for pantry-photo, 'grocery' for receipt. */
+  destination: DetectedItemDestination;
 };
 
 /** Confidence below this threshold triggers the "low confidence" UI badge. */
@@ -51,8 +58,14 @@ export type ScanParseResponse = {
  *
  * Defensive: clamps confidence to [0, 1], normalizes optional fields, and
  * generates stable ids for FlatList keys.
+ *
+ * @param response - Raw AI gateway response
+ * @param defaultDestination - Where items default to (pantry-photo → 'pantry', receipt → 'grocery')
  */
-export function parseDetectedItems(response: ScanParseResponse): DetectedItem[] {
+export function parseDetectedItems(
+  response: ScanParseResponse,
+  defaultDestination: DetectedItemDestination = 'pantry',
+): DetectedItem[] {
   if (!response || !Array.isArray(response.items)) {
     return [];
   }
@@ -68,6 +81,7 @@ export function parseDetectedItems(response: ScanParseResponse): DetectedItem[] 
       location: normalizeLocation(raw.location),
       expiresAt: typeof raw.expiresAt === 'string' ? raw.expiresAt.trim() : '',
       isIncluded: true,
+      destination: defaultDestination,
     };
   });
 }
@@ -91,4 +105,58 @@ function normalizeLocation(value: unknown): string {
 
   // Capitalize first letter of unknown locations
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+
+// ---------------------------------------------------------------------------
+// Duplicate detection
+// ---------------------------------------------------------------------------
+
+export type DuplicateMatch = {
+  detectedItemId: string;
+  detectedName: string;
+  /** localId of the existing pantry item that matches. */
+  existingLocalId: string;
+  existingName: string;
+};
+
+/**
+ * Identifies items in `detectedItems` that already exist in the pantry list.
+ * Match is by normalized name (lowercased, whitespace-collapsed).
+ *
+ * Used by T8.3 receipt scan to prompt the user to merge duplicates.
+ */
+export function detectPantryDuplicates(
+  detectedItems: DetectedItem[],
+  existingPantryItems: Array<{ localId: string; name: string; normalizedName: string }>,
+): DuplicateMatch[] {
+  const existingByNormalizedName = new Map<string, { localId: string; name: string }>();
+  for (const existing of existingPantryItems) {
+    existingByNormalizedName.set(existing.normalizedName, {
+      localId: existing.localId,
+      name: existing.name,
+    });
+  }
+
+  const duplicates: DuplicateMatch[] = [];
+
+  for (const detected of detectedItems) {
+    if (!detected.isIncluded) continue;
+    if (detected.destination !== 'pantry') continue;
+
+    const normalized = detected.name.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+    if (!normalized) continue;
+
+    const match = existingByNormalizedName.get(normalized);
+    if (match) {
+      duplicates.push({
+        detectedItemId: detected.id,
+        detectedName: detected.name,
+        existingLocalId: match.localId,
+        existingName: match.name,
+      });
+    }
+  }
+
+  return duplicates;
 }
