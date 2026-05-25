@@ -41,3 +41,25 @@ example
 # generated native folders
 /ios
 /android
+
+# Agent tooling (local only)
+.claude/
+.kiro/
+.codex/
+.codegraph/
+AGENTS.md
+CLAUDE.md
+skills-lock.json
+
+# Production docs & planning (not app code)
+docs/
+
+# Reference design screens (not shipped in bundle)
+assets/recipee screens/
+
+# E2E test flows (local)
+.maestro/
+
+# Helper scripts (local)
+script/
+scripts/

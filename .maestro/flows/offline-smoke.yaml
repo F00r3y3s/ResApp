@@ -1,6 +1,0 @@
-appId: com.familyaikitchen.app
----
-- launchApp
-- assertVisible: "Cook from what your family already has."
-- assertVisible: "Guest offline"
-- assertVisible: "Core cooking tools are available offline."
