@@ -48,10 +48,14 @@
 
 ## Phase 3: Recipe Core
 
-- [ ] Add owned/permissive seed recipe format with attribution.
-- [ ] Add recipe repository and search/filter tests.
-- [ ] Build library, detail, save, manual entry, and import-review flows.
-- [ ] Add pantry match status using local pantry aliases.
+- [x] Add owned/permissive seed recipe format with attribution.
+- [x] Add recipe repository and search/filter tests.
+- [x] Build library, detail, save, manual entry, and import-review flows.
+  - [x] Library (screen 13) — search, filter chips, cards with cuisine/time/diet pills, saved indicator.
+  - [x] Detail (screen 14) — hero, ingredients, method preview, save toggle, servings stepper.
+  - [x] Manual entry (screen 15) — title/cuisine/servings + add/remove ingredient and step rows, Zod validation, modal route.
+  - [ ] Import review (screen 15 variant) — deferred. URL/photo/paste import will land alongside Phase 8 Kitchen Lens (T8.4 / receipt + label flows).
+- [x] Add pantry match status using local pantry aliases.
 
 ## Phase 4 And Later
 

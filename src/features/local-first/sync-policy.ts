@@ -22,6 +22,10 @@ const boundaries = {
   ai_photo_scan: 'server-required',
   receipt_scan: 'server-required',
   nutrition_lookup: 'server-required',
+  // T10.1 — circles must round-trip to Postgres so RLS can enforce membership.
+  // Queueing them locally would let a guest create orphaned rows that never sync.
+  circle: 'server-required',
+  circle_member: 'server-required',
   analytics_event: 'analytics-safe',
   local_draft: 'local-only',
 } as const;

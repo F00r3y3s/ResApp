@@ -10,20 +10,33 @@ import {
   Sparkles,
   Sun,
 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KitchenAssets, KitchenDesign } from '@/constants/kitchen-design';
 
 import type { GuestPreferences, PreferencesRepository } from '@/features/onboarding/preferences-repository';
-import { buildTodaySummary } from '@/features/today/today-model';
+import type { PantryItem, PantryRepository } from '@/features/pantry/pantry-repository';
+import type { Recipe, RecipesRepository } from '@/features/recipes/recipes-repository';
+import {
+  buildTodaySummary,
+  selectExpiringPantryAndSuggestions,
+  type RecipeSuggestion,
+} from '@/features/today/today-model';
 
-const expiringItems = [
+const fallbackExpiringItems = [
   { name: 'Spinach', daysLeft: '2 days left', image: KitchenAssets.todaySpinach },
   { name: 'Yogurt', daysLeft: '3 days left', image: KitchenAssets.todayYogurt },
   { name: 'Tomatoes', daysLeft: '4 days left', image: KitchenAssets.todayTomatoes },
 ] as const;
+
+const expiringImageByNormalizedName: Record<string, ReturnType<typeof require>> = {
+  spinach: KitchenAssets.todaySpinach,
+  yogurt: KitchenAssets.todayYogurt,
+  'greek yogurt': KitchenAssets.todayYogurt,
+  tomatoes: KitchenAssets.todayTomatoes,
+};
 
 const mealPlan = [
   { label: 'Breakfast: Oats', Icon: Sun, color: '#E69B12' },
@@ -31,15 +44,38 @@ const mealPlan = [
   { label: 'Dinner: Traybake', Icon: Moon, color: '#1C5F8F' },
 ] as const;
 
+export type TodayScreenContentProps = {
+  preferencesRepository: PreferencesRepository;
+  pantryRepository?: PantryRepository;
+  recipesRepository?: RecipesRepository;
+  /** Override "now" for deterministic expiry windowing in tests. */
+  now?: Date;
+};
+
 export function TodayScreenContent({
   preferencesRepository,
-}: {
-  preferencesRepository: PreferencesRepository;
-}) {
+  pantryRepository,
+  recipesRepository,
+  now,
+}: TodayScreenContentProps) {
   const insets = useSafeAreaInsets();
   const [preferences, setPreferences] = useState<GuestPreferences | null>(null);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  const selection = useMemo(() => {
+    if (!pantryRepository) {
+      return null;
+    }
+    return selectExpiringPantryAndSuggestions({
+      pantryItems,
+      recipes,
+      now: now ?? new Date(),
+    });
+  }, [pantryRepository, pantryItems, recipes, now]);
+
   const summary = buildTodaySummary({
-    pantryExpiringCount: 3,
+    pantryExpiringCount: selection ? selection.expiring.length : 3,
     savedRecipeCount: 4,
     groceryOpenCount: 3,
     isOnline: false,
@@ -63,6 +99,64 @@ export function TodayScreenContent({
       isMounted = false;
     };
   }, [preferencesRepository]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!pantryRepository) {
+      setPantryItems([]);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    pantryRepository
+      .listItems()
+      .then((items) => {
+        if (isMounted) {
+          setPantryItems(items);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPantryItems([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [pantryRepository]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!recipesRepository) {
+      setRecipes([]);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    recipesRepository
+      .listRecipes()
+      .then((next) => {
+        if (isMounted) {
+          setRecipes(next);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setRecipes([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [recipesRepository]);
+
+  const referenceNow = now ?? new Date();
+  const showRealExpiring = selection !== null && selection.expiring.length > 0;
+  const showSuggestions = selection !== null && selection.suggestions.length > 0;
 
   return (
     <ScrollView
@@ -119,16 +213,52 @@ export function TodayScreenContent({
       </View>
 
       <View style={styles.expiringRow}>
-        {expiringItems.map((item) => (
-          <View key={item.name} style={styles.expiringCard}>
-            <Image source={item.image} resizeMode="cover" style={styles.expiringImage} />
-            <View style={styles.expiringCopy}>
-              <Text style={styles.expiringName}>{item.name}</Text>
-              <Text style={styles.expiringDays}>{item.daysLeft}</Text>
-            </View>
-          </View>
-        ))}
+        {showRealExpiring
+          ? selection!.expiring.slice(0, 3).map((item) => {
+              const image = expiringImageByNormalizedName[item.normalizedName];
+              return (
+                <View key={item.localId} style={styles.expiringCard}>
+                  {image ? (
+                    <Image source={image} resizeMode="cover" style={styles.expiringImage} />
+                  ) : (
+                    <View style={[styles.expiringImage, styles.expiringImageFallback]}>
+                      <Text style={styles.expiringImageInitial}>
+                        {item.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.expiringCopy}>
+                    <Text style={styles.expiringName}>{item.name}</Text>
+                    <Text style={styles.expiringDays}>
+                      {formatExpiryDays(item.expiresAt, referenceNow)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          : fallbackExpiringItems.map((item) => (
+              <View key={item.name} style={styles.expiringCard}>
+                <Image source={item.image} resizeMode="cover" style={styles.expiringImage} />
+                <View style={styles.expiringCopy}>
+                  <Text style={styles.expiringName}>{item.name}</Text>
+                  <Text style={styles.expiringDays}>{item.daysLeft}</Text>
+                </View>
+              </View>
+            ))}
       </View>
+
+      {showSuggestions ? (
+        <View style={styles.suggestionsBlock}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Cook with what expires</Text>
+          </View>
+          <View style={styles.suggestionList}>
+            {selection!.suggestions.slice(0, 3).map((suggestion) => (
+              <SuggestionRow key={suggestion.recipe.localId} suggestion={suggestion} />
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.gridRow}>
         <View style={styles.mealCard}>
@@ -197,6 +327,56 @@ const cardBorder = {
   borderColor: KitchenDesign.colors.border,
   borderWidth: 1,
 } as const;
+
+function SuggestionRow({ suggestion }: { suggestion: RecipeSuggestion }) {
+  const targetId = suggestion.recipe.seedId ?? suggestion.recipe.localId;
+  const totalMinutes = suggestion.recipe.prepMinutes + suggestion.recipe.cookMinutes;
+  const usingLabel = `Uses ${suggestion.expiringMatchCount} expiring ${
+    suggestion.expiringMatchCount === 1 ? 'item' : 'items'
+  }`;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${suggestion.recipe.title}`}
+      onPress={() => router.push(`/recipe/${targetId}`)}
+      style={({ pressed }) => [styles.suggestionCard, pressed ? styles.pressed : null]}>
+      <View style={styles.suggestionIconWrap}>
+        <ChefHat size={28} stroke={KitchenDesign.colors.cream} />
+      </View>
+      <View style={styles.suggestionCopy}>
+        <Text style={styles.suggestionTitle}>{suggestion.recipe.title}</Text>
+        <Text style={styles.suggestionMeta}>
+          {usingLabel}
+          {totalMinutes > 0 ? ` · ${totalMinutes} min` : ''}
+        </Text>
+      </View>
+      <ChevronRight size={22} stroke={KitchenDesign.colors.muted} />
+    </Pressable>
+  );
+}
+
+function formatExpiryDays(expiresAt: string | null, now: Date): string {
+  if (!expiresAt) {
+    return 'Use soon';
+  }
+  const expiryTime = Date.parse(`${expiresAt}T00:00:00.000Z`);
+  if (Number.isNaN(expiryTime)) {
+    return 'Use soon';
+  }
+  const startOfDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = Math.round((expiryTime - startOfDay) / 86_400_000);
+  if (days < 0) {
+    return 'Expired';
+  }
+  if (days === 0) {
+    return 'Expires today';
+  }
+  if (days === 1) {
+    return '1 day left';
+  }
+  return `${days} days left`;
+}
 
 const styles = StyleSheet.create({
   screen: {
@@ -370,6 +550,54 @@ const styles = StyleSheet.create({
     color: KitchenDesign.colors.orangePressed,
     fontSize: 16,
     lineHeight: 20,
+  },
+  expiringImageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expiringImageInitial: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  suggestionsBlock: {
+    gap: 12,
+  },
+  suggestionList: {
+    gap: 10,
+  },
+  suggestionCard: {
+    minHeight: 78,
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: KitchenDesign.colors.porcelain,
+    ...cardBorder,
+  },
+  suggestionIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: KitchenDesign.colors.orange,
+  },
+  suggestionCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  suggestionTitle: {
+    color: KitchenDesign.colors.ink,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
+  },
+  suggestionMeta: {
+    color: KitchenDesign.colors.muted,
+    fontSize: 14,
+    lineHeight: 18,
   },
   gridRow: {
     flexDirection: 'row',

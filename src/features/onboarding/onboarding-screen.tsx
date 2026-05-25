@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KitchenDesign } from '@/constants/kitchen-design';
+import { Analytics } from '@/lib/analytics/analytics';
 
 
 import type { GuestPreferencesInput, PreferencesRepository } from './preferences-repository';
@@ -81,6 +82,7 @@ export function OnboardingScreenContent({ repository }: OnboardingScreenContentP
 
     try {
       await repository.savePreferences(preferences);
+      Analytics.track('onboarding_completed', { step_count: steps.length });
       router.replace('/sync-consent');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save preferences.');

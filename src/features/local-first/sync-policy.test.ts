@@ -36,4 +36,9 @@ describe('local-first sync policy', () => {
     expect(getSyncBoundary('ai_photo_scan')).toBe('server-required');
     expect(getSyncBoundary('analytics_event')).toBe('analytics-safe');
   });
+
+  it('marks circle membership as server-required so guests cannot queue it locally', () => {
+    expect(getSyncBoundary('circle')).toBe('server-required');
+    expect(getSyncBoundary('circle_member')).toBe('server-required');
+  });
 });

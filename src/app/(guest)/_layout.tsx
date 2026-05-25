@@ -1,12 +1,12 @@
 import { Tabs } from 'expo-router';
 import {
-  BookOpen,
-  CalendarDays,
-  Camera,
-  Home,
-  Settings,
-  ShoppingBasket,
-  Wheat,
+    BookOpen,
+    CalendarDays,
+    Camera,
+    Home,
+    Settings,
+    ShoppingBasket,
+    Wheat,
 } from 'lucide-react-native';
 
 import { KitchenDesign } from '@/constants/kitchen-design';
@@ -83,6 +83,20 @@ export default function GuestTabsLayout() {
           href: null,
           title: 'Settings',
           tabBarIcon: ({ color, size }) => <Settings size={size} stroke={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="recipe/[id]"
+        options={{
+          href: null,
+          title: 'Recipe detail',
+        }}
+      />
+      <Tabs.Screen
+        name="recipe/cook/[id]"
+        options={{
+          href: null,
+          title: 'Cook mode',
         }}
       />
       <Tabs.Screen
