@@ -179,3 +179,172 @@ describe('ScanReviewScreenContent — capture & review (T8.1)', () => {
     expect(screen.getByText(/Take photo/i)).toBeTruthy();
   });
 });
+
+describe('ScanReviewScreenContent — AI scan parse (T8.2)', () => {
+  beforeEach(() => {
+    mockBackCalls.length = 0;
+  });
+
+  function makeTestPantryRepo() {
+    const items: any[] = [];
+    return {
+      pantryRepository: {
+        async addItem(input: any) {
+          const item = {
+            localId: `local-${items.length + 1}`,
+            name: String(input.name),
+            normalizedName: String(input.name).toLocaleLowerCase(),
+            quantity: Number(input.quantity),
+            unit: String(input.unit),
+            location: String(input.location),
+            expiresAt: input.expiresAt || null,
+            privacy: 'local-only' as const,
+            createdAt: '2026-05-25T10:00:00.000Z',
+            updatedAt: '2026-05-25T10:00:00.000Z',
+          };
+          items.push(item);
+          return item;
+        },
+        async updateItem() {
+          throw new Error('not used');
+        },
+        async deleteItem() {
+          throw new Error('not used');
+        },
+        async listItems() {
+          return [...items];
+        },
+      } as any,
+      getItems: () => items,
+    };
+  }
+
+  it('shows "Detect items" button instead of "Looks good" when AI sender is provided', async () => {
+    const { pantryRepository } = makeTestPantryRepo();
+    const scanParseSender = jest
+      .fn()
+      .mockResolvedValue({ items: [] }) as any;
+
+    render(
+      <ScanReviewScreenContent
+        controller={makeController()}
+        pantryRepository={pantryRepository}
+        scanParseSender={scanParseSender}
+      />,
+    );
+
+    fireEvent.press(screen.getByText(/Take photo/i));
+
+    await waitFor(() => {
+      expect(screen.getByText('Detect items')).toBeTruthy();
+    });
+
+    expect(screen.queryByText('Looks good')).toBeNull();
+  });
+
+  it('calls AI gateway scan-parse and shows confirm screen with detected items', async () => {
+    const { pantryRepository } = makeTestPantryRepo();
+    const scanParseSender = jest.fn().mockResolvedValue({
+      items: [
+        {
+          name: 'Spinach',
+          confidence: 0.92,
+          quantity: '1',
+          unit: 'bag',
+          location: 'Fridge',
+          expiresAt: '2026-05-30',
+        },
+        { name: 'Yogurt', confidence: 0.85 },
+      ],
+    }) as any;
+
+    render(
+      <ScanReviewScreenContent
+        controller={makeController()}
+        pantryRepository={pantryRepository}
+        scanParseSender={scanParseSender}
+      />,
+    );
+
+    fireEvent.press(screen.getByText(/Take photo/i));
+
+    await waitFor(() => {
+      expect(screen.getByText('Detect items')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('Detect items'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Review detected items')).toBeTruthy();
+    });
+
+    expect(screen.getByDisplayValue('Spinach')).toBeTruthy();
+    expect(screen.getByDisplayValue('Yogurt')).toBeTruthy();
+    expect(scanParseSender).toHaveBeenCalledWith('file:///tmp/captured.jpg');
+  });
+
+  it('saves confirmed items to pantry repository and dismisses screen', async () => {
+    const { pantryRepository, getItems } = makeTestPantryRepo();
+    const scanParseSender = jest.fn().mockResolvedValue({
+      items: [{ name: 'Spinach', confidence: 0.92, quantity: '1', unit: 'bag', location: 'Fridge' }],
+    }) as any;
+
+    render(
+      <ScanReviewScreenContent
+        controller={makeController()}
+        pantryRepository={pantryRepository}
+        scanParseSender={scanParseSender}
+      />,
+    );
+
+    fireEvent.press(screen.getByText(/Take photo/i));
+
+    await waitFor(() => {
+      expect(screen.getByText('Detect items')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('Detect items'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Review detected items')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Confirm all and save'));
+
+    await waitFor(() => {
+      expect(getItems()).toHaveLength(1);
+    });
+
+    expect(getItems()[0].name).toBe('Spinach');
+    // Should navigate back after saving
+    expect(mockBackCalls.length).toBeGreaterThan(0);
+  });
+
+  it('shows error when AI gateway fails and lets user rescan', async () => {
+    const { pantryRepository } = makeTestPantryRepo();
+    const scanParseSender = jest.fn().mockRejectedValue(new Error('Gateway timeout')) as any;
+
+    render(
+      <ScanReviewScreenContent
+        controller={makeController()}
+        pantryRepository={pantryRepository}
+        scanParseSender={scanParseSender}
+      />,
+    );
+
+    fireEvent.press(screen.getByText(/Take photo/i));
+
+    await waitFor(() => {
+      expect(screen.getByText('Detect items')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('Detect items'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Gateway timeout')).toBeTruthy();
+    });
+
+    // User is back on review screen — can rescan
+    expect(screen.getByText('Detect items')).toBeTruthy();
+  });
+});

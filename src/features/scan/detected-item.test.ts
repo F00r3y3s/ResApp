@@ -1,0 +1,145 @@
+import { describe, expect, it } from '@jest/globals';
+
+import {
+    LOW_CONFIDENCE_THRESHOLD,
+    parseDetectedItems,
+    type ScanParseResponse,
+} from './detected-item';
+
+describe('parseDetectedItems', () => {
+  it('parses a typical AI gateway response', () => {
+    const response: ScanParseResponse = {
+      items: [
+        {
+          name: 'Spinach',
+          confidence: 0.92,
+          quantity: '1',
+          unit: 'bag',
+          location: 'Fridge',
+          expiresAt: '2026-05-30',
+        },
+        {
+          name: 'Yogurt',
+          confidence: 0.85,
+          quantity: 1,
+          unit: 'tub',
+          location: 'fridge',
+        },
+      ],
+    };
+
+    const items = parseDetectedItems(response);
+
+    expect(items).toHaveLength(2);
+    expect(items[0].name).toBe('Spinach');
+    expect(items[0].confidence).toBe(0.92);
+    expect(items[0].location).toBe('Fridge');
+    expect(items[0].expiresAt).toBe('2026-05-30');
+    expect(items[0].isIncluded).toBe(true);
+
+    expect(items[1].name).toBe('Yogurt');
+    expect(items[1].quantity).toBe('1');
+    expect(items[1].location).toBe('Fridge'); // normalized lowercase
+    expect(items[1].expiresAt).toBe('');
+  });
+
+  it('returns empty array for empty response', () => {
+    expect(parseDetectedItems({ items: [] })).toEqual([]);
+  });
+
+  it('returns empty array for malformed response', () => {
+    expect(parseDetectedItems({} as unknown as ScanParseResponse)).toEqual([]);
+    expect(parseDetectedItems(null as unknown as ScanParseResponse)).toEqual([]);
+  });
+
+  it('clamps confidence to [0, 1]', () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'Item A', confidence: 1.5 },
+        { name: 'Item B', confidence: -0.2 },
+        { name: 'Item C', confidence: 0.5 },
+      ],
+    };
+
+    const items = parseDetectedItems(response);
+
+    expect(items[0].confidence).toBe(1);
+    expect(items[1].confidence).toBe(0);
+    expect(items[2].confidence).toBe(0.5);
+  });
+
+  it('marks items below LOW_CONFIDENCE_THRESHOLD for review', () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'High Confidence', confidence: 0.95 },
+        { name: 'Low Confidence', confidence: 0.4 },
+      ],
+    };
+
+    const items = parseDetectedItems(response);
+
+    expect(items[0].confidence).toBeGreaterThanOrEqual(LOW_CONFIDENCE_THRESHOLD);
+    expect(items[1].confidence).toBeLessThan(LOW_CONFIDENCE_THRESHOLD);
+  });
+
+  it('defaults missing fields to safe values', () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'Bare Item', confidence: 0.8 },
+      ],
+    };
+
+    const items = parseDetectedItems(response);
+
+    expect(items[0].quantity).toBe('1');
+    expect(items[0].unit).toBe('');
+    expect(items[0].location).toBe('Pantry');
+    expect(items[0].expiresAt).toBe('');
+    expect(items[0].isIncluded).toBe(true);
+  });
+
+  it('normalizes location values', () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'A', confidence: 1, location: 'fridge' },
+        { name: 'B', confidence: 1, location: 'FREEZER' },
+        { name: 'C', confidence: 1, location: 'refrigerator' },
+        { name: 'D', confidence: 1, location: 'cabinet' },
+      ],
+    };
+
+    const items = parseDetectedItems(response);
+
+    expect(items[0].location).toBe('Fridge');
+    expect(items[1].location).toBe('Freezer');
+    expect(items[2].location).toBe('Fridge');
+    expect(items[3].location).toBe('Cabinet');
+  });
+
+  it('generates unique ids for FlatList keys', () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'A', confidence: 1 },
+        { name: 'B', confidence: 1 },
+      ],
+    };
+
+    const items = parseDetectedItems(response);
+
+    expect(items[0].id).not.toBe(items[1].id);
+  });
+
+  it('handles non-numeric confidence values', () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'A', confidence: NaN as any },
+        { name: 'B', confidence: 'high' as any },
+      ],
+    };
+
+    const items = parseDetectedItems(response);
+
+    expect(items[0].confidence).toBe(0);
+    expect(items[1].confidence).toBe(0);
+  });
+});

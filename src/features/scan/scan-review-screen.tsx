@@ -13,22 +13,41 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KitchenDesign } from '@/constants/kitchen-design';
+import type { PantryRepository } from '@/features/pantry/pantry-repository';
 
+import {
+    parseDetectedItems,
+    type DetectedItem,
+    type ScanParseResponse
+} from './detected-item';
+import { ScanConfirmScreen } from './scan-confirm-screen';
 import { createScanController, type ScanController } from './scan-controller';
+
+export type ScanParseSender = (imageUri: string) => Promise<ScanParseResponse>;
 
 type ScanReviewScreenContentProps = {
   controller?: ScanController;
+  /** Pantry repository for saving confirmed items. */
+  pantryRepository?: PantryRepository;
+  /** AI gateway sender for scan-parse. If null, confirm flow is disabled (T8.1 fallback). */
+  scanParseSender?: ScanParseSender | null;
 };
 
 type ScanState =
   | { kind: 'idle' }
   | { kind: 'requesting' }
   | { kind: 'reviewing'; uri: string }
+  | { kind: 'parsing'; uri: string }
+  | { kind: 'confirming'; uri: string; items: DetectedItem[] }
   | { kind: 'denied'; source: 'camera' | 'gallery' };
 
 const defaultController = createScanController();
 
-export function ScanReviewScreenContent({ controller = defaultController }: ScanReviewScreenContentProps) {
+export function ScanReviewScreenContent({
+  controller = defaultController,
+  pantryRepository,
+  scanParseSender,
+}: ScanReviewScreenContentProps) {
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<ScanState>({ kind: 'idle' });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -88,15 +107,55 @@ export function ScanReviewScreenContent({ controller = defaultController }: Scan
     setState({ kind: 'idle' });
   }, []);
 
-  const handleConfirm = useCallback(() => {
-    // T8.1 confirmation is a placeholder. Saving + AI processing is owned by
-    // T8.2; here we only return to the previous screen and emit a console
-    // breadcrumb for manual QA. The image uri stays in-memory only.
-    if (state.kind === 'reviewing') {
-      console.log('[scan] review confirmed (T8.1 placeholder)');
+  const handleConfirm = useCallback(async () => {
+    if (state.kind !== 'reviewing') return;
+
+    // If no AI sender or pantry repo provided, fall back to T8.1 behavior:
+    // just dismiss the screen.
+    if (!scanParseSender || !pantryRepository) {
+      handleCancel();
+      return;
     }
-    handleCancel();
-  }, [handleCancel, state]);
+
+    setState({ kind: 'parsing', uri: state.uri });
+    setErrorMessage(null);
+
+    try {
+      const response = await scanParseSender(state.uri);
+      const items = parseDetectedItems(response);
+      setState({ kind: 'confirming', uri: state.uri, items });
+    } catch (error) {
+      setErrorMessage(toMessage(error));
+      setState({ kind: 'reviewing', uri: state.uri });
+    }
+  }, [state, scanParseSender, pantryRepository, handleCancel]);
+
+  const handleConfirmed = useCallback(
+    (savedCount: number) => {
+      // Save complete — return user to wherever they came from.
+      // Future: emit a toast or navigate to pantry.
+      console.log(`[scan] saved ${savedCount} items to pantry`);
+      handleCancel();
+    },
+    [handleCancel],
+  );
+
+  const handleCancelConfirm = useCallback(() => {
+    setState({ kind: 'idle' });
+    setErrorMessage(null);
+  }, []);
+
+  // Confirm view — separate full-screen flow once items are detected.
+  if (state.kind === 'confirming' && pantryRepository) {
+    return (
+      <ScanConfirmScreen
+        detectedItems={state.items}
+        pantryRepository={pantryRepository}
+        onConfirmed={handleConfirmed}
+        onCancel={handleCancelConfirm}
+      />
+    );
+  }
 
   return (
     <ScrollView
@@ -116,9 +175,11 @@ export function ScanReviewScreenContent({ controller = defaultController }: Scan
         <View style={styles.iconButton} />
       </View>
 
-      {state.kind === 'reviewing' ? (
+      {state.kind === 'reviewing' || state.kind === 'parsing' ? (
         <ReviewView
           uri={state.uri}
+          isParsing={state.kind === 'parsing'}
+          errorMessage={errorMessage}
           onCancel={handleCancel}
           onRescan={handleRescan}
           onConfirm={handleConfirm}
@@ -230,18 +291,20 @@ function CaptureView({ state, errorMessage, onCapture, onPickFromGallery }: Capt
 
 type ReviewViewProps = {
   uri: string;
+  isParsing: boolean;
+  errorMessage: string | null;
   onCancel: () => void;
   onRescan: () => void;
   onConfirm: () => void;
 };
 
-function ReviewView({ uri, onCancel, onRescan, onConfirm }: ReviewViewProps) {
+function ReviewView({ uri, isParsing, errorMessage, onCancel, onRescan, onConfirm }: ReviewViewProps) {
   return (
     <View style={styles.reviewWrap}>
       <Text style={styles.reviewTitle}>Review</Text>
       <Text style={styles.reviewBody}>
-        Looks good? You can rescan if it&rsquo;s blurry or cancel to go back. Saving and item
-        detection come in the next step.
+        Looks good? Confirm to detect items in the photo. Detected items can be edited and
+        confirmed before saving.
       </Text>
 
       <View style={styles.imageFrame}>
@@ -255,28 +318,56 @@ function ReviewView({ uri, onCancel, onRescan, onConfirm }: ReviewViewProps) {
         />
       </View>
 
+      {errorMessage ? (
+        <Text selectable style={styles.errorText}>
+          {errorMessage}
+        </Text>
+      ) : null}
+
       <View style={styles.reviewActions}>
         <Pressable
           accessibilityRole="button"
+          disabled={isParsing}
           onPress={onRescan}
-          style={({ pressed }) => [styles.secondaryButton, pressed ? styles.pressed : null]}>
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            pressed && !isParsing ? styles.pressed : null,
+            isParsing ? styles.disabled : null,
+          ]}>
           <RefreshCcw size={20} stroke={KitchenDesign.colors.ink} />
           <Text style={styles.secondaryButtonText}>Rescan</Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
+          disabled={isParsing}
           onPress={onCancel}
-          style={({ pressed }) => [styles.tertiaryButton, pressed ? styles.pressed : null]}>
+          style={({ pressed }) => [
+            styles.tertiaryButton,
+            pressed && !isParsing ? styles.pressed : null,
+            isParsing ? styles.disabled : null,
+          ]}>
           <Text style={styles.tertiaryButtonText}>Cancel</Text>
         </Pressable>
       </View>
 
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel="Confirm and detect items"
+        accessibilityState={{ disabled: isParsing }}
+        disabled={isParsing}
         onPress={onConfirm}
-        style={({ pressed }) => [styles.primaryButton, pressed ? styles.pressed : null]}>
-        <Text style={styles.primaryButtonText}>Looks good</Text>
+        style={({ pressed }) => [
+          styles.primaryButton,
+          pressed && !isParsing ? styles.pressed : null,
+          isParsing ? styles.disabled : null,
+        ]}>
+        {isParsing ? (
+          <ActivityIndicator color={KitchenDesign.colors.cream} />
+        ) : null}
+        <Text style={styles.primaryButtonText}>
+          {isParsing ? 'Detecting items...' : 'Detect items'}
+        </Text>
       </Pressable>
     </View>
   );
