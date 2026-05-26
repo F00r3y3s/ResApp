@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KitchenDesign } from '@/constants/kitchen-design';
+import type { GroceryRepository } from '@/features/grocery/grocery-repository';
 import type { PantryRepository } from '@/features/pantry/pantry-repository';
 
 import {
@@ -29,8 +30,12 @@ type ScanReviewScreenContentProps = {
   controller?: ScanController;
   /** Pantry repository for saving confirmed items. */
   pantryRepository?: PantryRepository;
+  /** Grocery repository — required when `scanMode === 'receipt'` so detected items can be routed there. */
+  groceryRepository?: GroceryRepository;
   /** AI gateway sender for scan-parse. If null, confirm flow is disabled (T8.1 fallback). */
   scanParseSender?: ScanParseSender | null;
+  /** Picks default behavior. Defaults to `'pantry-photo'` for the existing T8.2 flow. */
+  scanMode?: 'receipt' | 'pantry-photo';
 };
 
 type ScanState =
@@ -46,7 +51,9 @@ const defaultController = createScanController();
 export function ScanReviewScreenContent({
   controller = defaultController,
   pantryRepository,
+  groceryRepository,
   scanParseSender,
+  scanMode = 'pantry-photo',
 }: ScanReviewScreenContentProps) {
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<ScanState>({ kind: 'idle' });
@@ -122,13 +129,14 @@ export function ScanReviewScreenContent({
 
     try {
       const response = await scanParseSender(state.uri);
-      const items = parseDetectedItems(response);
+      const defaultDestination = scanMode === 'receipt' ? 'grocery' : 'pantry';
+      const items = parseDetectedItems(response, defaultDestination);
       setState({ kind: 'confirming', uri: state.uri, items });
     } catch (error) {
       setErrorMessage(toMessage(error));
       setState({ kind: 'reviewing', uri: state.uri });
     }
-  }, [state, scanParseSender, pantryRepository, handleCancel]);
+  }, [state, scanParseSender, pantryRepository, handleCancel, scanMode]);
 
   const handleConfirmed = useCallback(
     (savedCount: number) => {
@@ -151,6 +159,8 @@ export function ScanReviewScreenContent({
       <ScanConfirmScreen
         detectedItems={state.items}
         pantryRepository={pantryRepository}
+        groceryRepository={groceryRepository}
+        scanMode={scanMode}
         onConfirmed={handleConfirmed}
         onCancel={handleCancelConfirm}
       />

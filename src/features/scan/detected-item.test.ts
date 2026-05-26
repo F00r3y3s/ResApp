@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 
+import type { GroceryItemDraft } from '@/features/grocery/grocery-model';
+
 import {
+    detectedItemToGroceryDraft,
     detectPantryDuplicates,
     LOW_CONFIDENCE_THRESHOLD,
     parseDetectedItems,
@@ -109,6 +112,36 @@ describe('parseDetectedItems', () => {
     const items = parseDetectedItems(response, 'grocery');
 
     expect(items[0].destination).toBe('grocery');
+  });
+
+  it("defaults every item to 'grocery' when called with 'grocery'", () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'Milk', confidence: 0.9 },
+        { name: 'Eggs', confidence: 0.8 },
+        { name: 'Bread', confidence: 0.7 },
+      ],
+    };
+
+    const items = parseDetectedItems(response, 'grocery');
+
+    expect(items).toHaveLength(3);
+    expect(items.every((item) => item.destination === 'grocery')).toBe(true);
+  });
+
+  it("defaults every item to 'pantry' when called with 'pantry'", () => {
+    const response: ScanParseResponse = {
+      items: [
+        { name: 'Milk', confidence: 0.9 },
+        { name: 'Eggs', confidence: 0.8 },
+        { name: 'Bread', confidence: 0.7 },
+      ],
+    };
+
+    const items = parseDetectedItems(response, 'pantry');
+
+    expect(items).toHaveLength(3);
+    expect(items.every((item) => item.destination === 'pantry')).toBe(true);
   });
 
   it('normalizes location values', () => {
@@ -247,5 +280,96 @@ describe('detectPantryDuplicates', () => {
     const dupes = detectPantryDuplicates(detected, existing);
 
     expect(dupes).toEqual([]);
+  });
+});
+
+
+describe('detectedItemToGroceryDraft', () => {
+  function buildItem(overrides: Partial<DetectedItem> = {}): DetectedItem {
+    return {
+      id: 'detected-1',
+      name: 'Milk',
+      confidence: 0.9,
+      quantity: '1',
+      unit: 'gallon',
+      location: 'Fridge',
+      expiresAt: '2026-05-30',
+      isIncluded: true,
+      destination: 'grocery',
+      ...overrides,
+    };
+  }
+
+  it('produces a GroceryItemDraft with name, normalizedName, quantity, and unit', () => {
+    const draft: GroceryItemDraft = detectedItemToGroceryDraft(
+      buildItem({ name: 'Milk', quantity: '2', unit: 'gallon' }),
+    );
+
+    expect(draft.name).toBe('Milk');
+    expect(draft.normalizedName).toBe('milk');
+    expect(draft.quantity).toBe('2');
+    expect(draft.unit).toBe('gallon');
+    expect(draft.recipeId).toBeNull();
+    expect(draft.recipeTitle).toBeNull();
+  });
+
+  it('normalizes names with extra whitespace and mixed case', () => {
+    const draft = detectedItemToGroceryDraft(
+      buildItem({ name: '  Whole   Milk  ' }),
+    );
+
+    // The user-facing `name` is preserved verbatim from the DetectedItem.
+    expect(draft.name).toBe('  Whole   Milk  ');
+    // normalizedName collapses whitespace and lowercases.
+    expect(draft.normalizedName).toBe('whole milk');
+  });
+
+  it('preserves empty quantity and unit per the GroceryItemDraft contract', () => {
+    const draft = detectedItemToGroceryDraft(
+      buildItem({ quantity: '', unit: '' }),
+    );
+
+    // GroceryItemDraft.quantity and .unit are non-nullable strings, so empty
+    // values are passed through verbatim — the helper does not invent a default.
+    expect(draft.quantity).toBe('');
+    expect(draft.unit).toBe('');
+  });
+
+  it('drops expiry and location entirely', () => {
+    const draft = detectedItemToGroceryDraft(
+      buildItem({ expiresAt: '2026-05-30', location: 'Fridge' }),
+    ) as GroceryItemDraft & Record<string, unknown>;
+
+    expect(draft).not.toHaveProperty('expiresAt');
+    expect(draft).not.toHaveProperty('location');
+  });
+
+  it('always sets recipeId and recipeTitle to null (no recipe context)', () => {
+    const draft = detectedItemToGroceryDraft(buildItem());
+
+    expect(draft.recipeId).toBeNull();
+    expect(draft.recipeTitle).toBeNull();
+  });
+
+  it('still maps excluded items (filtering is the caller responsibility)', () => {
+    const draft = detectedItemToGroceryDraft(
+      buildItem({ isIncluded: false, name: 'Bread' }),
+    );
+
+    expect(draft.name).toBe('Bread');
+    expect(draft.normalizedName).toBe('bread');
+  });
+
+  it('maps items regardless of their destination (caller decides routing)', () => {
+    const pantryItem = buildItem({ destination: 'pantry', name: 'Rice' });
+    const groceryItem = buildItem({ destination: 'grocery', name: 'Rice' });
+
+    const fromPantry = detectedItemToGroceryDraft(pantryItem);
+    const fromGrocery = detectedItemToGroceryDraft(groceryItem);
+
+    expect(fromPantry.name).toBe('Rice');
+    expect(fromPantry.normalizedName).toBe('rice');
+    expect(fromGrocery.name).toBe('Rice');
+    expect(fromGrocery.normalizedName).toBe('rice');
   });
 });

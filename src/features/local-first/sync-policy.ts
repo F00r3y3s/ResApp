@@ -20,6 +20,9 @@ const boundaries = {
   cook_progress: 'syncable-after-consent',
   chat_history: 'syncable-after-consent',
   ai_photo_scan: 'server-required',
+  ai_suggestion: 'server-required',
+  ai_chat: 'server-required',
+  ai_meal_plan: 'server-required',
   receipt_scan: 'server-required',
   nutrition_lookup: 'server-required',
   // T10.1 — circles must round-trip to Postgres so RLS can enforce membership.

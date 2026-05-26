@@ -1,7 +1,12 @@
-import { ScanReviewScreenContent } from '@/features/scan/scan-review-screen';
+import { ScanModePillRow } from '@/features/scan/scan-mode-pill-row';
 
+/**
+ * Lens tab — entry point for scan flows (T8.3).
+ *
+ * Renders the mode pill row that pushes into `(modals)/scan` with the right
+ * `?type` query param. Capture/review and AI-gateway fallback live in the
+ * modal route, so this tab stays a thin composition surface.
+ */
 export default function LensScreen() {
-  // T8.1 Kitchen Lens capture-and-review slice. Lives directly on the Lens tab
-  // for now — moves to a modal route when premium scan flows arrive in T8.2+.
-  return <ScanReviewScreenContent />;
+  return <ScanModePillRow />;
 }

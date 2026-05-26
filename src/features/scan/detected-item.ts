@@ -1,3 +1,5 @@
+import type { GroceryItemDraft } from '@/features/grocery/grocery-model';
+
 /**
  * Detected pantry item from an AI scan-parse call.
  *
@@ -128,7 +130,7 @@ export type DuplicateMatch = {
  */
 export function detectPantryDuplicates(
   detectedItems: DetectedItem[],
-  existingPantryItems: Array<{ localId: string; name: string; normalizedName: string }>,
+  existingPantryItems: { localId: string; name: string; normalizedName: string }[],
 ): DuplicateMatch[] {
   const existingByNormalizedName = new Map<string, { localId: string; name: string }>();
   for (const existing of existingPantryItems) {
@@ -159,4 +161,43 @@ export function detectPantryDuplicates(
   }
 
   return duplicates;
+}
+
+
+// ---------------------------------------------------------------------------
+// Grocery draft mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps a `DetectedItem` to a `GroceryItemDraft` for use by the receipt-scan
+ * flow when routing items to the grocery list.
+ *
+ * Used by T8.3: items the user marks as `destination: 'grocery'` are passed
+ * through `groceryRepository.addMultipleToList(drafts)` after this mapping.
+ *
+ * Decisions:
+ * - `name` is preserved verbatim so the user's edits in the confirm screen
+ *   land in the grocery row exactly as typed. The grocery repo's
+ *   `inferSection` reads `name` to assign a section.
+ * - `normalizedName` collapses whitespace and lowercases so duplicate
+ *   detection in the grocery repo works the same way it does for pantry.
+ * - `quantity` and `unit` pass through verbatim (including empty strings)
+ *   per the `GroceryItemDraft` contract — both are non-nullable `string`.
+ * - `recipeId` and `recipeTitle` are always `null` because receipt-scan
+ *   items have no source recipe.
+ * - Expiry and location are intentionally dropped — they are not part of
+ *   the `GroceryItemDraft` contract.
+ *
+ * Filtering by `isIncluded` and `destination` is the caller's responsibility;
+ * this helper is a pure field mapping.
+ */
+export function detectedItemToGroceryDraft(item: DetectedItem): GroceryItemDraft {
+  return {
+    name: item.name,
+    normalizedName: item.name.trim().toLocaleLowerCase().replace(/\s+/g, ' '),
+    quantity: item.quantity,
+    unit: item.unit,
+    recipeId: null,
+    recipeTitle: null,
+  };
 }
