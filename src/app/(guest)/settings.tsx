@@ -1,5 +1,5 @@
-import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Link, router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
 
@@ -21,6 +21,13 @@ export default function SettingsScreen() {
       <Text style={styles.body}>
         Guest mode works locally. Account, sync, AI, sharing, and purchases stay opt-in.
       </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push('/welcome')}
+        style={({ pressed }) => [styles.authRow, pressed ? styles.pressed : null]}>
+        <Text style={styles.authRowTitle}>Sign in or create account</Text>
+        <Text style={styles.authRowDetail}>Sync, share, and unlock premium features.</Text>
+      </Pressable>
       {settingsRows.map((row) => (
         <View key={row} style={styles.row}>
           <Text style={styles.rowTitle}>{row}</Text>
@@ -39,6 +46,16 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.four, gap: Spacing.three },
   title: { color: Colors.light.text, fontSize: 28, lineHeight: 34, fontWeight: '900' },
   body: { color: Colors.light.textSecondary, fontSize: 16, lineHeight: 24 },
+  authRow: {
+    minHeight: 72,
+    borderRadius: 8,
+    padding: Spacing.three,
+    backgroundColor: '#FFF3E0',
+    borderColor: '#F1B35C',
+    borderWidth: 1,
+  },
+  authRowTitle: { color: Colors.light.text, fontSize: 16, fontWeight: '800' },
+  authRowDetail: { color: Colors.light.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 4 },
   row: {
     minHeight: 64,
     borderRadius: 8,
@@ -56,4 +73,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     paddingVertical: 12,
   },
+  pressed: { opacity: 0.84 },
 });

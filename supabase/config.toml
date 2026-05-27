@@ -1,0 +1,16 @@
+# Supabase config for local testing of the Family AI Kitchen project.
+# T10.1 introduces the circles + circle_members tables that protect family data.
+# Run RLS tests via:
+#   npx supabase start            # one-off, brings up local stack via Docker
+#   npx supabase db reset         # applies migrations to a clean local DB
+#   npx supabase test db          # runs pgTAP tests in supabase/tests
+project_id = "family-ai-kitchen"
+
+[db]
+# Default supabase local Postgres port.
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false

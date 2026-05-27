@@ -1,76 +1,129 @@
 import { Tabs } from 'expo-router';
-import { BookOpen, CalendarDays, Home, ListChecks, Settings, Wheat } from 'lucide-react-native';
+import {
+    BookOpen,
+    CalendarDays,
+    Camera,
+    Home,
+    Settings,
+    ShoppingBasket,
+    Wheat,
+} from 'lucide-react-native';
 
-import { Colors } from '@/constants/theme';
+import { KitchenDesign } from '@/constants/kitchen-design';
 
 export default function GuestTabsLayout() {
-  const tintColor = Colors.light.herb;
+  const tintColor = KitchenDesign.colors.orange;
 
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: tintColor,
-        tabBarInactiveTintColor: Colors.light.textSecondary,
+        tabBarInactiveTintColor: '#333333',
         tabBarStyle: {
-          minHeight: 64,
-          paddingTop: 8,
-          paddingBottom: 8,
-          backgroundColor: Colors.light.surface,
-          borderTopColor: Colors.light.border,
+          minHeight: 86,
+          paddingTop: 12,
+          paddingBottom: 12,
+          backgroundColor: KitchenDesign.colors.porcelain,
+          borderTopColor: KitchenDesign.colors.border,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '700',
-        },
-        headerStyle: {
-          backgroundColor: Colors.light.background,
-        },
-        headerTitleStyle: {
-          color: Colors.light.text,
-          fontWeight: '800',
+          fontSize: 13,
+          fontWeight: '500',
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Today',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Home size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
-        name="pantry"
+        name="lens"
         options={{
-          title: 'Pantry',
-          tabBarIcon: ({ color, size }) => <Wheat color={color} size={size} />,
+          title: 'Lens',
+          tabBarIcon: ({ color, size }) => <Camera size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="recipes"
         options={{
           title: 'Recipes',
-          tabBarIcon: ({ color, size }) => <BookOpen color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <BookOpen size={size} stroke={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="planner"
+        options={{
+          title: 'Plan',
+          tabBarIcon: ({ color, size }) => <CalendarDays size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="grocery"
         options={{
           title: 'Grocery',
-          tabBarIcon: ({ color, size }) => <ListChecks color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <ShoppingBasket size={size} stroke={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="pantry"
+        options={{
+          title: 'Pantry',
+          tabBarIcon: ({ color, size }) => <Wheat size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
+          href: null,
           title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Settings size={size} stroke={color} />,
         }}
       />
       <Tabs.Screen
-        name="planner"
+        name="recipe/[id]"
         options={{
-          title: 'Planner',
           href: null,
-          tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+          title: 'Recipe detail',
+        }}
+      />
+      <Tabs.Screen
+        name="recipe/cook/[id]"
+        options={{
+          href: null,
+          title: 'Cook mode',
+        }}
+      />
+      <Tabs.Screen
+        name="onboarding"
+        options={{
+          href: null,
+          title: 'Onboarding',
+        }}
+      />
+      <Tabs.Screen
+        name="sync-consent"
+        options={{
+          href: null,
+          title: 'Sync consent',
+        }}
+      />
+      <Tabs.Screen
+        name="creators"
+        options={{
+          href: null,
+          title: 'Creators',
+        }}
+      />
+      <Tabs.Screen
+        name="smart-chef"
+        options={{
+          href: null,
+          title: 'Smart Chef',
         }}
       />
     </Tabs>

@@ -53,11 +53,20 @@ const savedRecipes = new Table(
     local_id: column.text,
     remote_id: column.text,
     owner_id: column.text,
+    seed_id: column.text,
     title: column.text,
-    source: column.text,
-    attribution: column.text,
+    cuisine: column.text,
+    diet_tags_json: column.text,
+    allergens_json: column.text,
+    prep_minutes: column.integer,
+    cook_minutes: column.integer,
+    servings: column.integer,
     ingredients_json: column.text,
     steps_json: column.text,
+    image_key: column.text,
+    source: column.text,
+    attribution: column.text,
+    license: column.text,
     privacy: column.text,
     created_at: column.text,
     updated_at: column.text,
@@ -67,6 +76,8 @@ const savedRecipes = new Table(
     indexes: {
       recipe_title: ['title'],
       recipe_owner: ['owner_id'],
+      recipe_seed: ['seed_id'],
+      recipe_cuisine: ['cuisine'],
     },
   },
 );
@@ -87,6 +98,28 @@ const mealPlans = new Table(
   {
     indexes: {
       meal_plan_week: ['week_starts_on'],
+    },
+  },
+);
+
+const guestPreferences = new Table(
+  {
+    local_id: column.text,
+    language: column.text,
+    region: column.text,
+    household_size: column.integer,
+    dietary_rules_json: column.text,
+    allergies_json: column.text,
+    cuisines_json: column.text,
+    goals_json: column.text,
+    privacy: column.text,
+    updated_at: column.text,
+    deleted_at: column.text,
+  },
+  {
+    indexes: {
+      guest_preferences_region: ['region'],
+      guest_preferences_updated: ['updated_at'],
     },
   },
 );
@@ -114,6 +147,7 @@ export const AppSchema = new Schema({
   grocery_items: groceryItems,
   saved_recipes: savedRecipes,
   meal_plans: mealPlans,
+  guest_preferences: guestPreferences,
   sync_queue: syncQueue,
 });
 
@@ -122,3 +156,4 @@ export type PantryItemRecord = Database['pantry_items'];
 export type GroceryItemRecord = Database['grocery_items'];
 export type SavedRecipeRecord = Database['saved_recipes'];
 export type MealPlanRecord = Database['meal_plans'];
+export type GuestPreferencesRecord = Database['guest_preferences'];
