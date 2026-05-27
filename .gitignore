@@ -60,6 +60,13 @@ assets/recipee screens/
 # E2E test flows (local)
 .maestro/
 
+# Playwright MCP traces (local)
+.playwright-mcp/
+
+# Design artifacts (local dev only)
+design-artifacts/
+*.zip
+
 # Helper scripts (local)
 script/
 scripts/

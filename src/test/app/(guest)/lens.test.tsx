@@ -22,7 +22,7 @@ jest.mock('expo-router', () => ({
 
 // Import the route AFTER the mock so the mocked module is picked up.
 // eslint-disable-next-line import/first
-import LensScreen from './lens';
+import LensScreen from '../../../app/(guest)/lens';
 
 describe('LensScreen — mode pill entry points (T8.3 task 13)', () => {
   beforeEach(() => {

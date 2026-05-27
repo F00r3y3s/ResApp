@@ -64,7 +64,7 @@ jest.mock('@/features/scan/scan-review-screen', () => ({
 
 // Import the route AFTER mocks so the mocked modules are picked up.
 // eslint-disable-next-line import/first
-import ScanModalRoute from './scan';
+import ScanModalRoute from '@/app/(modals)/scan';
 
 function lastSpyProps(): ScanReviewScreenSpyProps {
   const calls = mockScreenSpy.mock.calls;
